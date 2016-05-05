@@ -23,7 +23,7 @@ class Input(object):
 
 		with tf.variable_scope("embed", reuse=False):
 			self.embedding = tf.get_variable("embedding", [config.vocab_size, self.size], 
-				initializer=tf.random_normal_initializer(-1.0, 1.0))
+				initializer=tf.random_uniform_initializer(-1.0, 1.0))
 
 
 	def step(self, session, config):
