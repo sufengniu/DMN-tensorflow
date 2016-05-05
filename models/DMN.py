@@ -13,7 +13,12 @@ import Input
 import Answer
 import Episodic
 
-class DMN(object):
+class DMN(Question, Input, Episodic, Answer):
+	"""
+		Dynamic Memory Network: it contains four modules: Input, Question, Anwser, Episodic Memory
+		check ref: Ask Me Anything: Dynamic Memory Networks for Natural Language Processing
+		
+	"""
 	def __init__(self, forward_only=False):
 		self.vocab_size = vocab_size
 		self.batch_size = batch_size
