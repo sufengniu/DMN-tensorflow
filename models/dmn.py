@@ -13,15 +13,33 @@ import Input
 import Answer
 import Episodic
 
-class Answer(object):
-	#def __init__(self, forward_only=False):
-	def answer_init(self, config, forward_only=False):
-		self.vocab_size = config.vocab_size
-		self.batch_size = config.batch_size
+class DMN(Question, Input, Episodic, Answer):
+	"""
+		Dynamic Memory Network: it contains four modules: Input, Question, Anwser, Episodic Memory
+		check ref: Ask Me Anything: Dynamic Memory Networks for Natural Language Processing
+		
+	"""
+	def __init__(self, forward_only=False):
+		self.vocab_size = vocab_size
+		self.batch_size = batch_size
 		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
 		self.global_step = tf.Variable(0, trainable=False, name='global_step')
 
 		self._input_data = tf.placeholder(tf.int32, [])
+
+		# Question module
+
+
+		# Episodic module
+
+
+		# Input module
+
+
+		# Answer module
+
+
+
 
 	def step(self, forward_only):
 		
