@@ -20,11 +20,11 @@ class Input(object):
 		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
 		self.global_step = tf.Variable(0, trainable=False, name='global_step')
 
-		self.embedding = tf.Variable(tf.random_normal([config.vocab_size, size], 0.0, 1.0))
 
-	
 		with tf.variable_scope("embed", reuse=False):
-			self.embedding = tf.get_variable("embedding", [config.vocab_size, self.size])
+			self.embedding = tf.get_variable("embedding", [config.vocab_size, self.size], 
+				initializer=tf.random_normal_initializer(-1.0, 1.0))
+
 
 	def step(self, session, config):
 
