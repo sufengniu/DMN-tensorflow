@@ -30,7 +30,7 @@ flags.DEFINE_integer("embedding_size", 16, "Size of each model layer.")
 flags.DEFINE_integer("depth", 1, "Number of layers in the model.")
 flags.DEFINE_integer("vocab_size", 80000, "vocabulary size.")
 flags.DEFINE_string("data_dir", "bAbI_data/en", "Data directory")
-flags.DEFINE_string("train_dir", "data", "Training directory.")
+flags.DEFINE_string("train_dir", "bAbI_data/en", "Training directory.")
 flags.DEFINE_string("model_types", "GRU", "RNN model types (LSTM, GRU)")
 flags.DEFINE_integer("max_train_data_size", 0, "Limit on the size of training data (0: no limit).")
 flags.DEFINE_integer("steps_per_checkpoint", 10, "How many training steps to do per checkpoint.")
@@ -43,11 +43,14 @@ FLAGS = flags.FLAGS
 
 
 def create_model():
-
+	model = dmn()
 
 
 def train():
 
+	
+	with tf.Session() as sess:
+		
 
 
 def test():
@@ -56,7 +59,7 @@ def test():
 
 def main(_):
 	if FLAGS.train:
-
+		train()
 
 
 
