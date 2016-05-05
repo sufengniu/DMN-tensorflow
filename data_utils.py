@@ -1,14 +1,13 @@
 
 from __future__ import division
 
+import re
 import sys
 import time
-
+import glob
 import numpy as np
 
-from memn2n.memory import MemoryL, MemoryBoW
-from memn2n.nn import AddTable, CrossEntropyLoss, Duplicate, ElemMult, LinearNB
-from memn2n.nn import Identity, ReLU, Sequential, LookupTable, Sum, Parallel, Softmax
+_WORD_SPLIT = re.compile("([, !?\"':;)(])")
 
 
 def parse_babi_task(data_files, dictionary, include_question):
@@ -25,8 +24,8 @@ def parse_babi_task(data_files, dictionary, include_question):
                 [0-9, question index], in which the first component is encoded as follows:
                     0 - story index
                     1 - index of the last sentence before the question
-                    2 - index of the answer word in dictionary
-                    3 to 13 - indices of supporting sentence
+                    2 to 3 - index of the answer word in dictionary
+                    4 to 13 - indices of supporting sentence
                     14 - line index
             qstory (2-D array) question's indices within a story
                 [index of word in question, question index] = index of word in dictionary
@@ -46,8 +45,10 @@ def parse_babi_task(data_files, dictionary, include_question):
     for fp in data_files:
         with open(fp) as f:
             for line_idx, line in enumerate(f):
+                line = line.replace(',',' ')
                 line = line.rstrip().lower()
                 words = line.split()
+                print words
 
                 # Story begins
                 if words[0] == '1':
@@ -92,13 +93,18 @@ def parse_babi_task(data_files, dictionary, include_question):
                         # NOTE: Punctuation is already removed from w
                         if words[k].endswith('?'):
                             answer = words[k + 1]
+                            flag = 2
+                            while not words[k+flag].isdigit():
+                                answer += ' '
+                                answer += words[k+flag]
+                                flag += 1
                             if answer not in dictionary:
                                 dictionary[answer] = len(dictionary)
 
                             questions[2, question_idx] = dictionary[answer]
 
                             # Indices of supporting sentences
-                            for h in range(k + 2, len(words)):
+                            for h in range(k + flag, len(words)):
                                 questions[1 + h - k, question_idx] = mapping[int(words[h]) - 1]
 
                             questions[-1, question_idx] = line_idx
@@ -138,3 +144,14 @@ class Progress(object):
             if self.count == self.total_length:
                 sys.stdout.write("\r" + " " * len(print_msg) + "\r")
             sys.stdout.flush()
+
+# data_dir = "bAbI_data/en"
+# train_data_path = glob.glob('%s/qa*_*_train.txt' % data_dir)
+# dictionary = {"nil": 0}
+# story, qustions, qstroy = parse_babi_task(train_data_path, dictionary, False)
+# # for e in story:
+#     for ee in e:
+#         print ('story:', ee)
+
+# print ('qustions:', qustions)
+# print ('qstroy:', qstroy)
