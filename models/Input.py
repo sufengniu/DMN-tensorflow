@@ -10,39 +10,27 @@ import tensorflow as tf
 
 class Input(object):
 	"""
-<<<<<<< HEAD
-	This class reads story sentence by sentence, generating sentence vecter
-	
-	"""
-	def init(self, config):
-		self.vocab_size = config.vocab_size
-		self.batch_size = batch_size
-		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
-		self.global_step = tf.Variable(0, trainable=False, name='global_step')
-
-		self._input_data = tf.placeholder(tf.int32, ][)
-
-	def step(self, session, config):
-
-=======
 		Input module: it contains Input fusion layer (bidirectional RNN)
+
+		Arg:
+
 	"""
-	#def __init__(self, config):
-	def init_Input(self, config):
-		self.vocab_size = config.vocab_size
-		self.batch_size = batch_size
-		self.size = 
-		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
-		self.global_step = tf.Variable(0, trainable=False, name='global_step')
+	def init_Input(self, num_layers, use_lstm, ):
+		self.num_layers = config.num_layers
+		self.use_lstm = False
 
+		single_cell = tf.nn.rnn_cell.GRUCell(size)
+		if use_lstm:
+			single_cell = tf.nn.rnn_cell.BasicLSTMCell(size)
+		if num_layers > 1:
+			cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * num_layers)
 
-		with tf.variable_scope("embed", reuse=False):
-			self.embedding = tf.get_variable("embedding", [config.vocab_size, self.size], 
-				initializer=tf.random_uniform_initializer(-1.0, 1.0))
+		def seq2seq_f(encoder_inputs):
+			return #todo
 
-
+		self.encoder_inputs = []
+		
 	def step(self, session, config):
-
 
 
 
@@ -51,4 +39,3 @@ class Input(object):
 
 	def supervised_step(self, session, config):
 		pass
->>>>>>> f30f3d3ed568bd2376c88897dad98c029fa675c7
