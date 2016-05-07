@@ -32,5 +32,3 @@ def embedding_rnn(encoder_inputs, vocab_size, cell, embedding_size, dtype=dtypes
 	return encoder_state
 
 
-
-
