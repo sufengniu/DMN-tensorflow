@@ -38,9 +38,10 @@ class DMN(Question, Input, Episodic, Answer):
 
 		self._input_data = tf.placeholder(tf.int32, [])
 
+
 		# Question module
 		try:
-			self.init_question(forward_only)
+			self.init_question(embedding_size, q_steps, forward_only)
 		except AttributeError:
 			raise NotImplementedError("question module init error!")
 
@@ -52,7 +53,7 @@ class DMN(Question, Input, Episodic, Answer):
 
 		# Input module
 		try:
-			self.init_input(forward_only)
+			self.init_input(embedding_size, i_steps, forward_only)
 		except AttributeError:
 			raise NotImplementedError("input module init error!")
 

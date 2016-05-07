@@ -14,6 +14,13 @@ import Answer
 import Episodic
 
 class Answer(object):
+	"""
+		Answer module:
+		Args:
+
+		Return:
+		
+	"""
 	#def __init__(self, forward_only=False):
 	def answer_init(self, config, forward_only=False):
 		self.vocab_size = config.vocab_size

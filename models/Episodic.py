@@ -12,8 +12,17 @@ import tensorflow as tf
 class Episodic(object):
 	"""
 		Episodic Memory module:
+		Args:
+
+		Return:
+
+
 	"""
 	def episodic_init(self):
 
 
-	
+		
+		
+
+	def step():
+

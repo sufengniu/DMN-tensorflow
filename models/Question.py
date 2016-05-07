@@ -48,24 +48,45 @@ class Question(object):
 		# with tf.variable_scope("EMBEDDING", reuse=True):
 		# 	embedding = tf.get_variable("embedding", [config.vocab_size, self.size])
 		# 	inputs = tf.nn.embedding_lookup(embedding, self._input_data)
-			
+
 		self._initial_state = cell.zero_state(batch_size, tf.float32)
 
 		if not forward_only and config.dropout < 1:
 			inputs = tf.nn.dropout(inputs, config.dropout)
-
-		from tensorflow.models.rnn import rnn
+	
 		inputs = [tf.squeeze(input_, [1])
 			for input_ in tf.split(1, self.num_steps, inputs)]
+
 		state = self._initial_state
-		with tf.variable_scope("RNN"):
-			outputs, state = rnn.rnn(cell, inputs, initial_state=self._initial_state)
-
-
-	def step(self, session, forward_only=True):
 		
-		if not forward_only:
+		self.output, self.losses = seq2seq.embedding_rnn
 
+		params = tf.trainable_variable()
+		if not forward_only:
+			self.gradient_norms = []
+			self.updates = []
+			opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+
+			gradients = tf.gradients(self.losses, params)
+			clipped_gradients, norm = tf.clip_by_global_norm(gradients,
+				max_gradient_norm)
+			self.gradient_norms.append(norm)
+			self.updates.append(opt.apply_gradients(
+				zip(clipped_gradients, params), global_step=self.global_step))
+
+		self.saver = tf.train.Saver(tf.all_variables())
+
+	def step(self, session, inputs, forward_only=True):
+		
+
+		if not forward_only:
+			output_feed
 		else:
 
 
+		outputs = session.run(output_feed, input_feed)
+
+		if not forward_only:
+			return 
+		else:
+			return 
