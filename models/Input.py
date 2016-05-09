@@ -26,24 +26,37 @@ class Input(object):
 
 	"""
 	def init_Input(self, num_layers, use_lstm, n_hidden ):
+
+		# input module
 		self.num_layers = config.num_layers
 		self.use_lstm = False
 		# tobe defined
+		dropout
+		learning_rate_decay_op
+		learning_rate
+		num_steps
+		global_step
 		embedding_size
 		vocab_size
-		n_length????
+		length????
 		n_sentence?
 		state_size??
 		#sentence reader cell
 		reader_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
 		if use_lstm:
 			reader_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+		if not forward_only and dropout < 1:
+			reader_cell = tf.nn.rnn_cell.DropoutWrapper(
+				reader_cell, output_keep_prob=dropout)
 		#embed toekn into vector, feed into rnn cell return cell state
+
+
 		def seq2seq_f(encoder_inputs):
-			return seq2seq.embedding_rnn(
-				encoder_inputs, vocab_size, reader_cell, embedding_size)
-		#sentence token placeholder
-		self.s = tf.placeholder(tf.int32,[None, n_length, n_sentence])
+			return seq2seq.sentence_embedding_rnn(
+				encoder_inputs, length, vocab_size, reader_cell, embedding_size)
+		
+		# Sentence token placeholder
+		self.story = tf.placeholder(tf.int32, [n_sentence, length])
 
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
 		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
@@ -51,9 +64,25 @@ class Input(object):
 			fusion_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
 			fusion_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
 
+		if not forward_only and dropout < 1:
+			fusion_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
+				fusion_fw_cell, output_keep_prob=dropout)
+			fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
+				fusion_bw_cell, output_keep_prob=dropout)
+
 
 		outputs = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
-			lambda x: seq2seq_f(self.s))
+			lambda x: seq2seq_f(self.story))
+
+		# question module
+		question_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+		if use_lstm:
+			question_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+		if not forward_only and dropout < 1:
+			question_cell = tf.nn.rnn_cell.DropoutWrapper(
+				question_cell, output_keep_prob=dropout)
+
+		self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
 
 
