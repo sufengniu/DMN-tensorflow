@@ -29,7 +29,7 @@ class DMN(object):
 
 	"""
 	def __init__(self, vocab_size, embedding_size, learning_rate, learning_rate_decay_op, memory_hops,
-		, dropout_rate, maximum_length=20, maximum_sentence=10, use_lstm=False, forward_only=False):
+		, dropout_rate, maximum_story_length=50, maximum_question_length=30, use_lstm=False, forward_only=False):
 
 		# initialization
 		self.vocab_size = vocab_size
@@ -56,9 +56,9 @@ class DMN(object):
 		
 
 		# question module
-		def seq2seq_f(encoder_inputs):
+		def seq2seq_f(encoder_inputs, input_mask):
 			return seq2seq.sentence_embedding_rnn(
-				encoder_inputs, maximum_length, vocab_size, reader_cell, embedding_size)
+				encoder_inputs, input_mask, vocab_size, reader_cell, embedding_size)
 		# attention gate in episodic
 		def feedfoward_nn(l1_input):
 			with tf.variable_scope("episodic"):
@@ -73,7 +73,13 @@ class DMN(object):
 
 
 		# Sentence token placeholder
-		self.story = tf.placeholder(tf.int32)
+		self.story = []
+		for i in range(maximum_story_length):
+			self.story.append(tf.placeholder(tf.int32))
+		self.story_mask = placeholder(tf.int32)
+		self.question = []
+		for i in range(maximum_question_length):
+			self.question.append(tf.placeholder(tf.int32))
 
 		# configuration of attention gate
 		input_size = 
@@ -102,10 +108,6 @@ class DMN(object):
 				single_cell, output_keep_prob=dropout)
 		if q_depth > 1:
 			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell])
-		self.question = 
-		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
-
-
 		#------------ Input module ------------
 		reader_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		if use_lstm:
@@ -113,7 +115,7 @@ class DMN(object):
 		if not forward_only and dropout < 1:
 			reader_cell = tf.nn.rnn_cell.DropoutWrapper(
 				reader_cell, output_keep_prob=dropout_rate)
-		#embed toekn into vector, feed into rnn cell return cell state
+		# Embedded toekn into vector, feed into rnn cell return cell state
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
 		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
 		if use_lstm:
@@ -177,7 +179,7 @@ class DMN(object):
 		loss = 
 
 	def step(self, session, context, question, answer, forward_only):
-		context
+		
 
 
 	def get_qns(self, data_set):
