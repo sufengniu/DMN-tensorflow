@@ -37,16 +37,10 @@ from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.ops import variable_scope as vs
 
 
-from tensorflow.python.platform import tf_logging as logging
-
-
-
 class MGRUCell(RNNCell):
 	"""Modified Gated Recurrent Unit cell"""
 
-	def __init__(self, num_units, input_size=None):
-		if input_size is not None:
-			logging.warn("%s: The input_size parameter is deprecated." % self)
+	def __init__(self, num_units):
 		self._num_units = num_units
 
 	@property
@@ -62,12 +56,29 @@ class MGRUCell(RNNCell):
 		with vs.variable_scope(scope or type(self).__name__):	# "GRUCell"
 			with vs.variable_scope("Gates"):	# Reset gate and update gate.
 				# We start with bias of 1.0 to not reset and not update.
-				r = rnn_cell.linear([inputs, state], self._num_units, True, 1.0))
+				r = rnn_cell.linear([inputs, state], self._num_units, True, 1.0, scope=scope))
 				r = sigmoid(r)
 			with vs.variable_scope("Candidate"):
 				c = tanh(rnn_cell.linear([inputs, r * state], self._num_units, True))
 			new_h = episodic_gate * state + (1 - episodic_gate) * c
 		return new_h, new_h
+
+class MemCell(RNNCell):
+	""" simplified recurrent cell for memory"""
+
+	def __init__(self, num_units):
+		self._num_units = num_units
+
+	@property
+	def state_size(self):
+		return self._num_units
+
+	def __call__(self, inputs, question, state, scope=None):
+		""" simple Recurrent cell for memory updates """
+
+		with tf.variable_scope("episodic"):
+			new_state = tf.nn.relu(tf.matmul(tf.matmul(tf.concat(0, [state, inputs, question]), mem_weights) + mem_bias)
+		return new_state
 
 def rnn(cell, inputs, initial_state=None, episodic_gate, dtype=None,
 		sequence_length=None, scope=None):
@@ -133,3 +144,7 @@ def rnn(cell, inputs, initial_state=None, episodic_gate, dtype=None,
 			outputs.append(output)
 
 		return (outputs, state)
+
+
+
+

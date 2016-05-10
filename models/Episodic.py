@@ -32,9 +32,33 @@ class Episodic(object):
 		self.ep_depth
 		self._ep_initial_state = cell.zero_state(batch_size, tf.float32)
 
+		# configuration of attention gate
+		input_size = 
+		l1_size = 
+		l2_size = 
+		mem_size = # memory cell size
+		mem_input_size = 
+		with tf.variable_scope("episodic"):
+			# parameters of attention gate
+			l1_weights = tf.Variable(tf.truncated_normal([input_size, l1_size], -0.1, 0.1))
+			l1_biases = tf.Variable(tf.zeros([l1_size]))
+			l2_weights = tf.Variable(tf.truncated_normal([l1_size, l2_size], -0.1, 0.1))
+			l2_biases = tf.Variable(tf.zeros([l2_size]))
+			# paramters of episodic
+			mem_weights = tf.Variable(tf.truncated_normal([mem_input_size, mem_size], -0.1, 0.1))
+			mem_biases = tf.Variable(tf.zeros([mem_size]))
+
+		def feedfoward_nn(l1_input):
+			l2_input = tf.tanh(tf.matmul(l1_input * l1_weights) + l1_biases)
+			logits = tf.matmul(l2_input * l2_weights) + l2_biases
+			gate_prediction = tf.nn.softmax(logits)
+			return gate_prediction
+
+
 		# construct memory cell
-		#single_cell = tf.nn.rnn_cell.GRUCell(self.mem_size)
-		single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.mem_size)
+		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.mem_size)
+		#single_cell = cell.MemCell(self.mem_size)
+		single_cell = tf.nn.rnn_cell.GRUCell(self.mem_size)
 		if mem_depth > 1:
 			mem_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * mem_depth)
 
@@ -47,11 +71,22 @@ class Episodic(object):
 
 
 		for hops in xrange(self.memory_hops):
-			output, state = cell.rnn(ep_cell[hops], _inputs, initial_state=self._ep_initial_state)
+			# gate attention network
+			z = tf.concat(0, [tf.mul(facts, q),
+				tf.mul(facts, mem_state), tf.abs(tf.sub(facts, q)), tf.abs(tf.sub(facts, mem_state))])
+			episodic_gate = feedfoward_nn(z)
+			# attention GRU
+			output, context = cell.rnn(ep_cell[hops], facts, initial_state=self._ep_initial_state, 
+				episodic_gate=episodic_gate, scope="epsodic")
+			context_state.append(context)
+			# memory updates
+			if hops is 0:
+				mem_state = question
+			_, mem_state = mem_cell(context_state, question, mem_state)
 
-
+	
 		# define optimization
 
 
 	def step():
-
+		
