@@ -16,6 +16,9 @@ import tensorflow as tf
 from tensorflow.contrib import skflow
 
 import data_utils
+import models.DMN
+import models.cell
+import models.seq2seq
 
 
 flags=tf.app.flags
@@ -26,7 +29,7 @@ flags.DEFINE_integer("embedding_size", 300, "Size of each model layer.")
 flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
 flags.DEFINE_float("learning_rate_decay_op", 0.99, "Learning rate decay.")
 flags.DEFINE_float("dropout_rate", 0.5, "dropout rates")
-# flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
+flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 # flags.DEFINE_integer("batch_size", 32, "Batch size to use during training.")
 # flags.DEFINE_integer("max_len", 100, "sequence length longer than this will be ignored.")
 # flags.DEFINE_integer("depth", 1, "Number of layers in the model.")
@@ -44,8 +47,14 @@ FLAGS = flags.FLAGS
 
 def create_model(session, forward_only):
 
-	model = dmn(FLAGS.vocab_size, FLAGS.embedding_size, FLAGS.learning_rate, 
-		FLAGS.learning_rate_decay_op, FLAGS.dropout_rate, use_lstm=FLAGS.use_lstm)
+	model = dmn(FLAGS.vocab_size, 
+		FLAGS.embedding_size, 
+		FLAGS.learning_rate, 
+		FLAGS.learning_rate_decay_op, 
+		FLAGS.memory_hops,
+		FLAGS.dropout_rate,
+		FLAGS.maximum_story_length, 
+		use_lstm=FLAGS.use_lstm)
 	ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
 	if ckpt and tf.gfile.Exists(ckpt.model_checkpoint_path):
 		print("[*] Reading model parameters from %s" % ckpt.model_checkpoint_path)

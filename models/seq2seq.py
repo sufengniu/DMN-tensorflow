@@ -18,14 +18,14 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import rnn
 from tensorflow.python.ops import rnn_cell
-from tensorflow.python.ops import variable_scope
+from tensorflow.python.ops import variable_scop
 
 
 
 def sentence_embedding_rnn(_encoder_inputs, mask=None, vocab_size, cell, 
     embedding_size, ,dtype=dtypes.float32, scope=None):
 	"""
-
+    
 	"""
 	with variable_scope.variable_scope(scope or "embedding_rnn"):
 		encoder_cell = rnn_cell.EmbeddingWrapper(
