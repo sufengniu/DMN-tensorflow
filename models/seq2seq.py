@@ -22,7 +22,7 @@ from tensorflow.python.ops import variable_scope
 
 
 
-def sentence_embedding_rnn(_encoder_inputs, input_mask, vocab_size, cell, 
+def sentence_embedding_rnn(_encoder_inputs, input_mask=None, vocab_size, cell, 
     embedding_size, ,dtype=dtypes.float32, scope=None):
 	"""
 
@@ -32,13 +32,16 @@ def sentence_embedding_rnn(_encoder_inputs, input_mask, vocab_size, cell,
 				cell, embedding_class=vocab_size,
 				embedding_size=embedding_size)
         # Divde encoder_inputs by given input_mask
-        encoder_input = [[] for _ in input_mask]
-        mask = 0
-        for num in range(len(_encoder_inputs)):
-            encoder_input[mask].append(_encoder_inputs[num])
-            if num == input_mask[mask]:
-                mask += 1
-        encoder_state = None
+        if input_mask != None:
+            encoder_input = [[] for _ in input_mask]
+            mask = 0
+            for num in range(len(_encoder_inputs)):
+                encoder_input[mask].append(_encoder_inputs[num])
+                if num == input_mask[mask]:
+                    mask += 1
+        else:
+            encoder_input = [_encoder_inputs]
+        encoder_state = None     
         encoder_states = []
         for encoder_input in encoder_inputs:
             if encoder_state == None:
@@ -47,5 +50,7 @@ def sentence_embedding_rnn(_encoder_inputs, input_mask, vocab_size, cell,
                 _, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
 			encoder_states.append(encoder_state)
 	return encoder_states
+
+
 
 
