@@ -98,9 +98,6 @@ class DMN(object):
 			softmax_weights = tf.Variable(tf.truncated_normal([, ], -0.1, 0.1), name="softmax_weights")
 
 
-		
-
-
 		#------------ question module ------------
 		single_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
 		if use_lstm:
@@ -207,5 +204,5 @@ class DMN(object):
 		# 	output_feed = [self.losses[bucket_id]]	# Loss for this batch.
 
 
-	def get_qns(self, data_set):
-		"""Provide data set; return question and story"""
+	# def get_qns(self, data_set):
+	# 	"""Provide data set; return question and story"""

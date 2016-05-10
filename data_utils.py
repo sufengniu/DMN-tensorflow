@@ -107,6 +107,10 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
     for x in data_raw:
         inp = x["C"].lower().split(' ')
         inp = [w for w in inp if len(w) > 0]
+        # Add end of pass at the end of each story
+        inp.append('*')
+        inp.append('.')
+        print inp
         q = x["Q"].lower().split(' ')
         q = [w for w in q if len(w) > 0]
         
