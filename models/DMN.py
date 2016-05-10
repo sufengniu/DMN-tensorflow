@@ -58,9 +58,9 @@ class DMN(object):
 		
 		print("[*] Creating Dynamic Memory Network ...")
 		# question module
-		def seq2seq_f(encoder_inputs, mask=None):
+		def seq2seq_f(encoder_inputs, mask=None, cell):
 			return seq2seq.sentence_embedding_rnn(
-				encoder_inputs, mask, vocab_size, reader_cell, embedding_size)
+				encoder_inputs, mask, self.vocab_size, cell, self.embedding_size)
 		# attention gate in episodic
 		def feedfoward_nn(l1_input):
 			with tf.variable_scope("episodic"):
@@ -111,7 +111,7 @@ class DMN(object):
 		question_cell = single_cell
 		if q_depth > 1:
 			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell]*q_depth)
-		for question in	seq2seq.seq2seq_f(self.question):
+		for question in	seq2seq.seq2seq_f(self.question,cell=question_cell):
 			self.question_state = question
 		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
@@ -138,7 +138,7 @@ class DMN(object):
 
 
 		self.facts = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
-			lambda x: seq2seq_f(self.story))
+			lambda x: seq2seq_f(self.story, cell=reader_cell))
 
 
 		
@@ -186,7 +186,7 @@ class DMN(object):
 			(answer, a_state) = answer_cell(tf.concat(0, [self.question_state, y]), a_state)
 			#(answer, a_state) = answer_cell(tf.concat(0, [question, mem_state]), a_state)
 
-		logits = 
+		logits =  
 
 		loss = 
 
