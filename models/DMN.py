@@ -68,7 +68,7 @@ class DMN(object):
 
 
 		# Sentence token placeholder
-		self.story = tf.placeholder(tf.int32, [maximum_sentence, maximum_length])
+		self.story = tf.placeholder(tf.int32)
 
 		
 
@@ -165,11 +165,9 @@ class DMN(object):
 
 		loss = 
 
-	def step(self, session, forward_only):
+	def step(self, session, context, question, answer, forward_only):
+		context
 
 
 	def get_qns(self, data_set):
 		"""Provide data set; return question and story"""
-		
-
-		
