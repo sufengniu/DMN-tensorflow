@@ -53,11 +53,11 @@ class DMN(object):
 
 
 		
-
+		print("[*] Creating Dynamic Memory Network ...")
 		# question module
-		def seq2seq_f(encoder_inputs, input_mask):
+		def seq2seq_f(encoder_inputs, story_mask):
 			return seq2seq.sentence_embedding_rnn(
-				encoder_inputs, input_mask, vocab_size, reader_cell, embedding_size)
+				encoder_inputs, story_mask, vocab_size, reader_cell, embedding_size)
 		# attention gate in episodic
 		def feedfoward_nn(l1_input):
 			with tf.variable_scope("episodic"):
@@ -98,7 +98,7 @@ class DMN(object):
 			softmax_weights = tf.Variable(tf.truncated_normal([, ], -0.1, 0.1), name="softmax_weights")
 
 
-		print("[*] Creating Dynamic Memory Network ...")
+		
 
 
 		#------------ question module ------------
@@ -189,8 +189,22 @@ class DMN(object):
 
 		loss = 
 
-	def step(self, session, context, question, answer, forward_only):
-		
+	def step(self, session, story, story_mask, question, answer, forward_only):
+		input_feed = {}
+		for l in range(len(story)):
+			input_feed[self.story[l].name] = story[l]
+		for l in range(len(question)):
+			input_feed[self.question[l].name] = question[l]
+		for l in range(len(answer)):
+			input_feed[self.answer[l].name] = answer[l]
+		input_feed[self.story_mask.name] = story_mask
+
+		# if not forward_only:
+		# 	output_feed = [self.updates[bucket_id],	# Update Op that does SGD.
+		# 								 self.gradient_norms[bucket_id],	# Gradient norm.
+		# 								 self.losses[bucket_id]]	# Loss for this batch.
+		# else:
+		# 	output_feed = [self.losses[bucket_id]]	# Loss for this batch.
 
 
 	def get_qns(self, data_set):

@@ -22,7 +22,7 @@ from tensorflow.python.ops import variable_scope
 
 
 
-def sentence_embedding_rnn(_encoder_inputs, input_mask=None, vocab_size, cell, 
+def sentence_embedding_rnn(_encoder_inputs, mask=None, vocab_size, cell, 
     embedding_size, ,dtype=dtypes.float32, scope=None):
 	"""
 
@@ -32,13 +32,13 @@ def sentence_embedding_rnn(_encoder_inputs, input_mask=None, vocab_size, cell,
 				cell, embedding_class=vocab_size,
 				embedding_size=embedding_size)
         # Divde encoder_inputs by given input_mask
-        if input_mask != None:
-            encoder_input = [[] for _ in input_mask]
-            mask = 0
+        if mask != None:
+            encoder_input = [[] for _ in mask]
+            _mask = 0
             for num in range(len(_encoder_inputs)):
-                encoder_input[mask].append(_encoder_inputs[num])
-                if num == input_mask[mask]:
-                    mask += 1
+                encoder_input[_mask].append(_encoder_inputs[num])
+                if num == mask[_mask]:
+                    _mask += 1
         else:
             encoder_input = [_encoder_inputs]
         encoder_state = None     
