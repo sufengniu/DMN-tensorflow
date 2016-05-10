@@ -25,7 +25,7 @@ def init_babi(fname):
     return tasks
 
 
-def get_babi_raw(id, test_id):
+def get_babi_raw(id, test_id=""):
     babi_map = {
         "1": "qa1_single-supporting-fact",
         "2": "qa2_two-supporting-facts",
@@ -88,17 +88,24 @@ def process_word(word, vocab, ivocab, silent=False):
     return vocab[word]
 
 
-def process_input(data_raw, input_mask_mode='sentence'):
+def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence'):
     questions = []
     inputs = []
     answers = []
     fact_counts = []
     input_masks = []
-    vocab = {}
-    ivocab = {}
+    if _vocab == _ivocab == None:
+        vocab = {}
+        ivocab = {}
+    elif _vocab == _ivocab:
+        vocab = _vocab
+        ivocab = _ivocab
+    else:
+        raise Exception("unmactched vocab")
+
     
     for x in data_raw:
-        inp = x["C"].lower().split(' ') 
+        inp = x["C"].lower().split(' ')
         inp = [w for w in inp if len(w) > 0]
         q = x["Q"].lower().split(' ')
         q = [w for w in q if len(w) > 0]
@@ -108,8 +115,8 @@ def process_input(data_raw, input_mask_mode='sentence'):
                                 ivocab = ivocab) for w in inp]
 
         q_vector = [process_word(word = w, 
-                                vocab = self.vocab, 
-                                ivocab = self.ivocab) for w in q]
+                                vocab = vocab, 
+                                ivocab = ivocab) for w in q]
 
         if (input_mask_mode == 'word'):
             input_mask = range(len(inp))
@@ -121,15 +128,18 @@ def process_input(data_raw, input_mask_mode='sentence'):
         inputs.append(inp_vector)
         questions.append(q_vector)
         # NOTE: here we assume the answer is one word! 
-        answers.append(utils.process_word(word = x["A"], 
-                                        vocab = self.vocab, 
-                                        ivocab = self.ivocab))
+        answers.append(process_word(word = x["A"], 
+                                        vocab = vocab, 
+                                        ivocab = ivocab))
         fact_counts.append(fact_count)
         input_masks.append(input_mask)
     
-    return inputs, questions, answers, fact_counts, input_masks, vocab, ivocab            
+    return inputs, questions, answers, fact_counts, input_masks, vocab, ivocab 
 
 
+
+babi_train_raw, babi_validation_raw = get_babi_raw("1")
+t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = process_input(babi_train_raw)
 
 
 
