@@ -18,7 +18,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import rnn
 from tensorflow.python.ops import rnn_cell
-from tensorflow.python.ops import variable_scop
+from tensorflow.python.ops import variable_scope
 
 
 
