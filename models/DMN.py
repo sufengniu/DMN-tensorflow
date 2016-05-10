@@ -13,7 +13,7 @@ import Input
 import Answer
 import Episodic
 
-class DMN(Question, Input, Episodic, Answer):
+class DMN(object):
 	"""
 		Dynamic Memory Network: it contains four modules: Input, Question, Anwser, Episodic Memory
 		check ref: Ask Me Anything: Dynamic Memory Networks for Natural Language Processing
@@ -30,41 +30,68 @@ class DMN(Question, Input, Episodic, Answer):
 
 
 	"""
-	def __init__(self, config, forward_only=False):
-		self.vocab_size = config.vocab_size
-		self.batch_size = config.batch_size
-		self.learning_rate = tf.Variable(float(config.learning_rate), trainable=False)
+	def __init__(self, vocab_size, embedding_size, learning_rate, learning_rate_decay_op,
+	dropout_rate, maximum_length=20, maximum_sentence=10, use_lstm=False, forward_only=False):
+		self.vocab_size = vocab_size
+		self.embedding_size = embedding_size
+		self.learning_rate = tf.Variable(float(learning_rate), trainable=False)
+		self.learning_rate_decay_op = tf.Variable(float(learning_rate_decay_op), trainable=False)
+		self.dropout_rate = dropout_rate
 		self.global_step = tf.Variable(0, trainable=False, name='global_step')
 
-		self._input_data = tf.placeholder(tf.int32, [])
-
-
-		# Question module
-		try:
-			self.init_question(embedding_size, q_steps, forward_only)
-		except AttributeError:
-			raise NotImplementedError("question module init error!")
-
-		# Episodic module
-		try:
-			self.init_episodic(forward_only)
-		except AttributeError:
-			raise NotImplementedError("episodic module init error!")
-
+		print("[*] Creating Dynamic Memory Network ...")
 		# Input module
-		try:
-			self.init_input(embedding_size, i_steps, forward_only)
-		except AttributeError:
-			raise NotImplementedError("input module init error!")
+		reader_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 
-		# Answer module
-		try:
-			self.init_answer(forward_only)
-		except AttributeError:
-			raise NotImplementedError("answer module init error!")
+		if use_lstm:
+			reader_cell = tf.nn.rnn_cell.BasicLSTMCell(self.embedding_size)
+		if not forward_only and dropout < 1:
+			reader_cell = tf.nn.rnn_cell.DropoutWrapper(
+				reader_cell, output_keep_prob=dropout_rate)
+		#embed toekn into vector, feed into rnn cell return cell state
+
+
+		def seq2seq_f(encoder_inputs):
+			return seq2seq.sentence_embedding_rnn(
+				encoder_inputs, maximum_length, vocab_size, reader_cell, embedding_size)
+		
+		# Sentence token placeholder
+		self.story = tf.placeholder(tf.int32, [maximum_sentence, maximum_length])
+
+		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+		if use_lstm:
+			fusion_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+			fusion_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+
+		if not forward_only and dropout < 1:
+			fusion_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
+				fusion_fw_cell, output_keep_prob=dropout)
+			fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
+				fusion_bw_cell, output_keep_prob=dropout)
+
+
+		outputs = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
+			lambda x: seq2seq_f(self.story))
+
+		# question module
+		question_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+		if use_lstm:
+			question_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+		if not forward_only and dropout < 1:
+			question_cell = tf.nn.rnn_cell.DropoutWrapper(
+				question_cell, output_keep_prob=dropout)
+
+		self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
 		
 
 
 	def step(self, session, forward_only):
+
+
+	def get_qns(self, data_set):
+		"""Provide data set; return question and story"""
+		
+
 		
