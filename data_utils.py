@@ -1,157 +1,135 @@
-
-from __future__ import division
-
-import re
-import sys
-import time
-import glob
+import os as os
 import numpy as np
 
-_WORD_SPLIT = re.compile("([, !?\"':;)(])")
+def init_babi(fname):
+    print "==> Loading test from %s" % fname
+    tasks = []
+    task = None
+    for i, line in enumerate(open(fname)):
+        id = int(line[0:line.find(' ')])
+        if id == 1:
+            task = {"C": "", "Q": "", "A": ""} 
+            
+        line = line.strip()
+        line = line.replace('.', ' . ')
+        line = line[line.find(' ')+1:]
+        if line.find('?') == -1:
+            task["C"] += line
+        else:
+            idx = line.find('?')
+            tmp = line[idx+1:].split('\t')
+            task["Q"] = line[:idx]
+            task["A"] = tmp[1].strip()
+            tasks.append(task.copy())
+
+    return tasks
 
 
-def parse_babi_task(data_files, dictionary, include_question):
-    """ Parse bAbI data.
-    Args:
-       data_files (list): a list of data file's paths.
-       dictionary (dict): word's dictionary
-       include_question (bool): whether count question toward input sentence.
-    Returns:
-        A tuple of (story, questions, qstory):
-            story (3-D array)
-                [position of word in sentence, sentence index, story index] = index of word in dictionary
-            questions (2-D array)
-                [0-9, question index], in which the first component is encoded as follows:
-                    0 - story index
-                    1 - index of the last sentence before the question
-                    2 to 3 - index of the answer word in dictionary
-                    4 to 13 - indices of supporting sentence
-                    14 - line index
-            qstory (2-D array) question's indices within a story
-                [index of word in question, question index] = index of word in dictionary
-    """
-    # Try to reserve spaces beforehand (large matrices for both 1k and 10k data sets)
-    # maximum number of words in sentence = 20
-    story     = np.zeros((20, 500, len(data_files) * 3500), np.int16)
-    questions = np.zeros((14, len(data_files) * 10000), np.int16)
-    qstory    = np.zeros((20, len(data_files) * 10000), np.int16)
+def get_babi_raw(id, test_id):
+    babi_map = {
+        "1": "qa1_single-supporting-fact",
+        "2": "qa2_two-supporting-facts",
+        "3": "qa3_three-supporting-facts",
+        "4": "qa4_two-arg-relations",
+        "5": "qa5_three-arg-relations",
+        "6": "qa6_yes-no-questions",
+        "7": "qa7_counting",
+        "8": "qa8_lists-sets",
+        "9": "qa9_simple-negation",
+        "10": "qa10_indefinite-knowledge",
+        "11": "qa11_basic-coreference",
+        "12": "qa12_conjunction",
+        "13": "qa13_compound-coreference",
+        "14": "qa14_time-reasoning",
+        "15": "qa15_basic-deduction",
+        "16": "qa16_basic-induction",
+        "17": "qa17_positional-reasoning",
+        "18": "qa18_size-reasoning",
+        "19": "qa19_path-finding",
+        "20": "qa20_agents-motivations",
+        "MCTest": "MCTest",
+        "19changed": "19changed",
+        "joint": "all_shuffled", 
+        "sh1": "../shuffled/qa1_single-supporting-fact",
+        "sh2": "../shuffled/qa2_two-supporting-facts",
+        "sh3": "../shuffled/qa3_three-supporting-facts",
+        "sh4": "../shuffled/qa4_two-arg-relations",
+        "sh5": "../shuffled/qa5_three-arg-relations",
+        "sh6": "../shuffled/qa6_yes-no-questions",
+        "sh7": "../shuffled/qa7_counting",
+        "sh8": "../shuffled/qa8_lists-sets",
+        "sh9": "../shuffled/qa9_simple-negation",
+        "sh10": "../shuffled/qa10_indefinite-knowledge",
+        "sh11": "../shuffled/qa11_basic-coreference",
+        "sh12": "../shuffled/qa12_conjunction",
+        "sh13": "../shuffled/qa13_compound-coreference",
+        "sh14": "../shuffled/qa14_time-reasoning",
+        "sh15": "../shuffled/qa15_basic-deduction",
+        "sh16": "../shuffled/qa16_basic-induction",
+        "sh17": "../shuffled/qa17_positional-reasoning",
+        "sh18": "../shuffled/qa18_size-reasoning",
+        "sh19": "../shuffled/qa19_path-finding",
+        "sh20": "../shuffled/qa20_agents-motivations",
+    }
+    if (test_id == ""):
+        test_id = id 
+    babi_name = babi_map[id]
+    babi_test_name = babi_map[test_id]
+    babi_train_raw = init_babi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en/%s_train.txt' % babi_name))
+    babi_test_raw = init_babi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en/%s_test.txt' % babi_test_name))
+    return babi_train_raw, babi_test_raw
 
-    # NOTE: question's indices are not reset when going through a new story
-    story_idx, question_idx, sentence_idx, max_words, max_sentences = -1, -1, -1, 0, 0
 
-    # Mapping line number (within a story) to sentence's index (to support the flag include_question)
-    mapping = None
+def process_word(word, vocab, ivocab, silent=False):
+    if not word in vocab: 
+        next_index = len(vocab)
+        vocab[word] = next_index
+        ivocab[next_index] = word
+    return vocab[word]
 
-    for fp in data_files:
-        with open(fp) as f:
-            for line_idx, line in enumerate(f):
-                line = line.replace(',',' ')
-                line = line.rstrip().lower()
-                words = line.split()
-                print words
 
-                # Story begins
-                if words[0] == '1':
-                    story_idx += 1
-                    sentence_idx = -1
-                    mapping = []
+def process_input(data_raw, input_mask_mode='sentence'):
+    questions = []
+    inputs = []
+    answers = []
+    fact_counts = []
+    input_masks = []
+    vocab = {}
+    ivocab = {}
+    
+    for x in data_raw:
+        inp = x["C"].lower().split(' ') 
+        inp = [w for w in inp if len(w) > 0]
+        q = x["Q"].lower().split(' ')
+        q = [w for w in q if len(w) > 0]
+        
+        inp_vector = [process_word(word = w, 
+                                vocab = vocab, 
+                                ivocab = ivocab) for w in inp]
 
-                # FIXME: This condition makes the code more fragile!
-                if '?' not in line:
-                    is_question = False
-                    sentence_idx += 1
-                else:
-                    is_question = True
-                    question_idx += 1
-                    questions[0, question_idx] = story_idx
-                    questions[1, question_idx] = sentence_idx
-                    if include_question:
-                        sentence_idx += 1
+        q_vector = [process_word(word = w, 
+                                vocab = self.vocab, 
+                                ivocab = self.ivocab) for w in q]
 
-                mapping.append(sentence_idx)
+        if (input_mask_mode == 'word'):
+            input_mask = range(len(inp))
+        elif (input_mask_mode == 'sentence'):
+            input_mask = [index for index, w in enumerate(inp) if w == '.']
+        else:
+            raise Exception("unknown input_mask_mode")
+        fact_count = len(input_mask)
+        inputs.append(inp_vector)
+        questions.append(q_vector)
+        # NOTE: here we assume the answer is one word! 
+        answers.append(utils.process_word(word = x["A"], 
+                                        vocab = self.vocab, 
+                                        ivocab = self.ivocab))
+        fact_counts.append(fact_count)
+        input_masks.append(input_mask)
+    
+    return inputs, questions, answers, fact_counts, input_masks, vocab, ivocab            
 
-                # Skip substory index
-                for k in range(1, len(words)):
-                    w = words[k]
 
-                    if w.endswith('.') or w.endswith('?'):
-                        w = w[:-1]
 
-                    if w not in dictionary:
-                        dictionary[w] = len(dictionary)
 
-                    if max_words < k:
-                        max_words = k
 
-                    if not is_question:
-                        story[k - 1, sentence_idx, story_idx] = dictionary[w]
-                    else:
-                        qstory[k - 1, question_idx] = dictionary[w]
-                        if include_question:
-                            story[k - 1, sentence_idx, story_idx] = dictionary[w]
-
-                        # NOTE: Punctuation is already removed from w
-                        if words[k].endswith('?'):
-                            answer = words[k + 1]
-                            flag = 2
-                            while not words[k+flag].isdigit():
-                                answer += ' '
-                                answer += words[k+flag]
-                                flag += 1
-                            if answer not in dictionary:
-                                dictionary[answer] = len(dictionary)
-
-                            questions[2, question_idx] = dictionary[answer]
-
-                            # Indices of supporting sentences
-                            for h in range(k + flag, len(words)):
-                                questions[1 + h - k, question_idx] = mapping[int(words[h]) - 1]
-
-                            questions[-1, question_idx] = line_idx
-                            break
-
-                if max_sentences < sentence_idx + 1:
-                    max_sentences = sentence_idx + 1
-
-    story     = story[:max_words, :max_sentences, :(story_idx + 1)]
-    questions = questions[:, :(question_idx + 1)]
-    qstory    = qstory[:max_words, :(question_idx + 1)]
-
-    return story, questions, qstory
-
-class Progress(object):
-    """
-    Progress bar
-    """
-
-    def __init__(self, iterable, bar_length=50):
-        self.iterable = iterable
-        self.bar_length = bar_length
-        self.total_length = len(iterable)
-        self.start_time = time.time()
-        self.count = 0
-
-    def __iter__(self):
-        for obj in self.iterable:
-            yield obj
-            self.count += 1
-            percent = self.count / self.total_length
-            print_length = int(percent * self.bar_length)
-            progress = "=" * print_length + " " * (self.bar_length - print_length)
-            elapsed_time = time.time() - self.start_time
-            print_msg = "\r|%s| %.0f%% %.1fs" % (progress, percent * 100, elapsed_time)
-            sys.stdout.write(print_msg)
-            if self.count == self.total_length:
-                sys.stdout.write("\r" + " " * len(print_msg) + "\r")
-            sys.stdout.flush()
-
-# data_dir = "bAbI_data/en"
-# train_data_path = glob.glob('%s/qa*_*_train.txt' % data_dir)
-# dictionary = {"nil": 0}
-# story, qustions, qstroy = parse_babi_task(train_data_path, dictionary, False)
-# # for e in story:
-#     for ee in e:
-#         print ('story:', ee)
-
-# print ('qustions:', qustions)
-# print ('qstroy:', qstroy)
