@@ -8,10 +8,8 @@ import numpy as np
 from six.moves import xrange 
 import tensorflow as tf
 
-import Question
-import Input
-import Answer
-import Episodic
+import seq2seq
+import cell
 
 class DMN(object):
 	"""
@@ -40,19 +38,21 @@ class DMN(object):
 		self.learning_rate_decay_op = tf.Variable(float(learning_rate_decay_op), trainable=False)
 		self.dropout_rate = dropout_rate
 		self.global_step = tf.Variable(0, trainable=False, name='global_step')
-		self.q_depth = q_depth
+		self.q_depth = q_depth	# question RNN depth
+		self.a_depth = a_depth	# answer RNN depth
+		self.m_depth = episodic_m_depth # memory cell depth
+		self.ep_depth = ep_depth	# episodic depth
+		
 		self.memory_hops = memory_hops	# number of episodic memory pass
 		self.facts =???	# inputs from Input modeule
 		self.num_steps = num_sentences
 
+		self.m_input_size = m_input_size
 		self.m_size = episodic_m_size # memory cell size
-		self.m_depth = episodic_m_depth # memory cell depth
 		self.ep_size # episodic cell size
-		self.ep_depth
 		self._ep_initial_state = cell.zero_state(batch_size, tf.float32)
 
 
-		print("[*] Creating Dynamic Memory Network ...")
 		
 
 		# question module
@@ -61,6 +61,11 @@ class DMN(object):
 				encoder_inputs, maximum_length, vocab_size, reader_cell, embedding_size)
 		# attention gate in episodic
 		def feedfoward_nn(l1_input):
+			with tf.variable_scope("episodic"):
+				l1_weights = get_variable("l1_weights", [input_size, l1_size])
+				l1_biases = get_variable("l1_biases", [l1_size])
+				l2_weights = get_variable("l2_weights", [l1_size, l2_size])
+				l2_biases = get_variable("l2_biases", [l2_size])
 			l2_input = tf.tanh(tf.matmul(l1_input * l1_weights) + l1_biases)
 			logits = tf.matmul(l2_input * l2_weights) + l2_biases
 			gate_prediction = tf.nn.softmax(logits)
@@ -70,8 +75,22 @@ class DMN(object):
 		# Sentence token placeholder
 		self.story = tf.placeholder(tf.int32)
 
-		
+		# configuration of attention gate
+		input_size = 
+		l1_size = 
+		l2_size =
+		with tf.variable_scope("episodic"):
+			# parameters of attention gate
+			l1_weights = tf.Variable(tf.truncated_normal([input_size, l1_size], -0.1, 0.1), name="l1_weights")
+			l1_biases = tf.Variable(tf.zeros([l1_size]), name="l1_biases")
+			l2_weights = tf.Variable(tf.truncated_normal([l1_size, l2_size], -0.1, 0.1), name="l2_weights")
+			l2_biases = tf.Variable(tf.zeros([l2_size]), name="l2_biases")
+			# paramters of episodic
+			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
+			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
 
+		
+		print("[*] Creating Dynamic Memory Network ...")
 
 
 		#------------ question module ------------
@@ -114,21 +133,7 @@ class DMN(object):
 
 		
 		#------------ episodic memory module ------------
-		# configuration of attention gate
-		input_size = 
-		l1_size = 
-		l2_size = 
-		mem_input_size = 
-		with tf.variable_scope("episodic"):
-			# parameters of attention gate
-			l1_weights = tf.Variable(tf.truncated_normal([input_size, l1_size], -0.1, 0.1))
-			l1_biases = tf.Variable(tf.zeros([l1_size]))
-			l2_weights = tf.Variable(tf.truncated_normal([l1_size, l2_size], -0.1, 0.1))
-			l2_biases = tf.Variable(tf.zeros([l2_size]))
-			# paramters of episodic
-			mem_weights = tf.Variable(tf.truncated_normal([mem_input_size, self.m_size], -0.1, 0.1))
-			mem_biases = tf.Variable(tf.zeros([self.m_size]))
-
+		
 		# construct memory cell
 		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.mem_size)
 		#single_cell = cell.MemCell(self.mem_size)
@@ -156,11 +161,17 @@ class DMN(object):
 			# memory updates
 			if hops is 0:
 				mem_state = question
-			_, mem_state = mem_cell(context_state, question, mem_state)
+			#_, mem_state = mem_cell(context_state, mem_state)	# GRU
+			_, mem_state = mem_cell(context_state, question, mem_state, self.m_input_size, self.m_size)
 
 		#------------ answer ------------
-
-
+		# TODO: use decoder sequence to generate answer
+		single_cell = tf.nn.rnn_cell.GRUCell(self.mem_size)
+		if a_depth > 1:
+			answer_cell =tf.nn.rnn_cell.MultiRNNCell([single_cell] * a_depth)
+		
+		for step in range(answer_steps):
+			() = cell(inputs)
 
 
 		loss = 
