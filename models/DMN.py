@@ -21,9 +21,12 @@ class DMN(object):
 			learning_rate: learning rate
 			embedding_size: embedding size, also the RNN first layer size
 			q_depth: question module layer depth
-			
+			a_depth: answer module layer depth
+			m_depth: memory cell depth
 			i_depth: input layer depth (not include input fusion layer)
-			
+			memory_hops: how many hops for episodic memory module
+
+
 		Returns:
 
 
@@ -55,9 +58,9 @@ class DMN(object):
 		
 		print("[*] Creating Dynamic Memory Network ...")
 		# question module
-		def seq2seq_f(encoder_inputs, story_mask):
+		def seq2seq_f(encoder_inputs, mask=None):
 			return seq2seq.sentence_embedding_rnn(
-				encoder_inputs, story_mask, vocab_size, reader_cell, embedding_size)
+				encoder_inputs, mask, vocab_size, reader_cell, embedding_size)
 		# attention gate in episodic
 		def feedfoward_nn(l1_input):
 			with tf.variable_scope("episodic"):
@@ -108,7 +111,8 @@ class DMN(object):
 		question_cell = single_cell
 		if q_depth > 1:
 			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell]*q_depth)
-		self.question = 
+		for question in	seq2seq.seq2seq_f(self.question):
+			self.question_state = question
 		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
 
@@ -165,9 +169,9 @@ class DMN(object):
 			context_state.append(context)
 			# memory updates
 			if hops is 0:
-				mem_state = question
+				mem_state = self.question_state
 			#_, mem_state = mem_cell(context_state, mem_state)	# GRU
-			_, mem_state = mem_cell(context_state, question, mem_state, self.m_input_size, self.m_size)
+			_, mem_state = mem_cell(context_state, self.question_state, mem_state, self.m_input_size, self.m_size)
 
 		#------------ answer ------------
 		# TODO: use decoder sequence to generate answer
@@ -179,7 +183,7 @@ class DMN(object):
 		a_state = mem_state
 		for step in range(answer_steps):
 			y = tf.nn.softmax(tf.matmul(softmax_weights, a_state))
-			(answer, a_state) = answer_cell(tf.concat(0, [question, y]), a_state)
+			(answer, a_state) = answer_cell(tf.concat(0, [self.question_state, y]), a_state)
 			#(answer, a_state) = answer_cell(tf.concat(0, [question, mem_state]), a_state)
 
 		logits = 
