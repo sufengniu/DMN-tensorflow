@@ -37,7 +37,7 @@ flags.DEFINE_boolean("use_lstm", False, "Set True using LSTM, or False using GRU
 flags.DEFINE_integer("steps_per_checkpoint", 50, "How many training steps to do per checkpoint.")
 # flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
-
+flags.DEFINE_string("data_type", "1", "choose babi_map, check data_utils for detail")
 FLAGS = flags.FLAGS
 
 
@@ -56,14 +56,20 @@ def create_model(session, forward_only):
 	return model
 
 def train():
-	train_data_path = glob.glob('%s/qa*_*_train.txt' % data_dir)
-	print("[*] Preparing bAbI data ... in %s" % FLAGS.data.dir)
-	bAbI_data, dictionary, rev_dictionary = data_utils.parse_babi_task(train_data_path, False)
-	
-
-
+	if FLAGS.data_type == "1":
+		print("[*] Preparing bAbI data ... in %s" % FLAGS.data.dir)
+		babi_train_raw, babi_validation_raw = data_utils.get_babi_raw("1")
+		t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = data_utils.process_input(babi_train_raw)
+		v_context, v_questions, v_answers, v_fact_counts, v_input_masks, vocab, ivocab = data_utils.process_input(babi_validation_raw, vocab, ivocab)
+	else:
+		raise Exception ("Only joint mode is allowed")
 	
 	with tf.Session() as sess:
+		model = create_model(sess, False)
+		step_time, loss = 0.0, 0.0
+		current_step = 0
+		previous_losses = []
+		
 		
 
 
@@ -77,6 +83,8 @@ def test():
 
 		# Fake data set
 		data_set = 
+
+def next_story():
 
 
 def main(_):
