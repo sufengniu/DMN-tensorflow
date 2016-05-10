@@ -14,7 +14,7 @@ class Episodic(object):
 	"""
 		Episodic Memory module:
 		Args:
-
+		
 		Return:
 
 
@@ -31,6 +31,8 @@ class Episodic(object):
 		self.ep_size # episodic cell size
 		self.ep_depth
 		self._ep_initial_state = cell.zero_state(batch_size, tf.float32)
+
+		
 
 		# configuration of attention gate
 		input_size = 
@@ -89,4 +91,4 @@ class Episodic(object):
 
 
 	def step():
-		
+

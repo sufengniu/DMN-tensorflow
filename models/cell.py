@@ -37,7 +37,8 @@ from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.ops import variable_scope as vs
 
 
-class MGRUCell(RNNCell):
+
+class MGRUCell(rnn_cell.RNNCell):
 	"""Modified Gated Recurrent Unit cell"""
 
 	def __init__(self, num_units):
@@ -56,14 +57,14 @@ class MGRUCell(RNNCell):
 		with vs.variable_scope(scope or type(self).__name__):	# "GRUCell"
 			with vs.variable_scope("Gates"):	# Reset gate and update gate.
 				# We start with bias of 1.0 to not reset and not update.
-				r = rnn_cell.linear([inputs, state], self._num_units, True, 1.0, scope=scope))
+				r = rnn_cell.linear([inputs, state], self._num_units, True, 1.0, scope=scope)
 				r = sigmoid(r)
 			with vs.variable_scope("Candidate"):
 				c = tanh(rnn_cell.linear([inputs, r * state], self._num_units, True))
 			new_h = episodic_gate * state + (1 - episodic_gate) * c
 		return new_h, new_h
 
-class MemCell(RNNCell):
+class MemCell(rnn_cell.RNNCell):
 	""" simplified recurrent cell for memory"""
 
 	def __init__(self, num_units):
@@ -79,10 +80,10 @@ class MemCell(RNNCell):
 		with tf.variable_scope("episodic"):
 			mem_weights = get_variable("mem_weights", [m_input_size, m_size])
 			mem_bias = get_variable("mem_biases", [m_size])
-		new_state = tf.nn.relu(tf.matmul(tf.matmul(tf.concat(0, [state, inputs, question]), mem_weights) + mem_biases)
+		new_state = tf.nn.relu(tf.matmul(tf.matmul(tf.concat(0, [state, inputs, question]), mem_weights) + mem_biases))
 		return new_state
 
-def rnn(cell, inputs, initial_state=None, episodic_gate, dtype=None,
+def rnn(cell, inputs, episodic_gate, initial_state=None, dtype=None,
 		sequence_length=None, scope=None):
 
 	if not isinstance(cell, rnn_cell.RNNCell):

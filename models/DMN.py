@@ -44,7 +44,6 @@ class DMN(object):
 		self.ep_depth = ep_depth	# episodic depth
 		
 		self.memory_hops = memory_hops	# number of episodic memory pass
-		self.facts =???	# inputs from Input modeule
 		self.num_steps = num_sentences
 
 		self.m_input_size = m_input_size
@@ -95,7 +94,10 @@ class DMN(object):
 			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
 			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
 
-		
+		with tf.variable_scope("answer"):
+			softmax_weights = tf.Variable(tf.truncated_normal([, ], -0.1, 0.1), name="softmax_weights")
+
+
 		print("[*] Creating Dynamic Memory Network ...")
 
 
@@ -106,8 +108,13 @@ class DMN(object):
 		if not forward_only and dropout < 1:
 			single_cell = tf.nn.rnn_cell.DropoutWrapper(
 				single_cell, output_keep_prob=dropout)
+		question_cell = single_cell
 		if q_depth > 1:
-			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell])
+			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell]*q_depth)
+		self.question = 
+		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
+
+
 		#------------ Input module ------------
 		reader_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		if use_lstm:
@@ -147,18 +154,17 @@ class DMN(object):
 		ep_cell = []
 		for i in xrange(self.memory_hops):
 			single_cell = cell.MGRUCell(self.ep_size)
-			if ep_depth > 1:
-				ep_cell.append(tf.nn.rnn_cell.MultiRNNCell([single_cell] * ep_depth))
+			ep_cell.append(tf.nn.rnn_cell.MultiRNNCell([single_cell] * ep_depth))
 
 
 		for hops in xrange(self.memory_hops):
 			# gate attention network
-			z = tf.concat(0, [tf.mul(facts, q),
-				tf.mul(facts, mem_state), tf.abs(tf.sub(facts, q)), tf.abs(tf.sub(facts, mem_state))])
+			z = tf.concat(0, [tf.mul(self.facts, q), tf.mul(self.facts, mem_state), 
+				tf.abs(tf.sub(self.facts, q)), tf.abs(tf.sub(self.facts, mem_state))])
 			episodic_gate = feedfoward_nn(z)
 			# attention GRU
-			output, context = cell.rnn(ep_cell[hops], facts, initial_state=self._ep_initial_state, 
-				episodic_gate=episodic_gate, scope="epsodic")
+			output, context = cell.rnn(ep_cell[hops], self.facts, episodic_gate, initial_state=self._ep_initial_state, 
+				scope="epsodic")
 			context_state.append(context)
 			# memory updates
 			if hops is 0:
@@ -169,12 +175,17 @@ class DMN(object):
 		#------------ answer ------------
 		# TODO: use decoder sequence to generate answer
 		single_cell = tf.nn.rnn_cell.GRUCell(self.mem_size)
+		answer_cell = single_cell
 		if a_depth > 1:
 			answer_cell =tf.nn.rnn_cell.MultiRNNCell([single_cell] * a_depth)
 		
+		a_state = mem_state
 		for step in range(answer_steps):
-			() = cell(inputs)
+			y = tf.nn.softmax(tf.matmul(softmax_weights, a_state))
+			(answer, a_state) = answer_cell(tf.concat(0, [question, y]), a_state)
+			#(answer, a_state) = answer_cell(tf.concat(0, [question, mem_state]), a_state)
 
+		logits = 
 
 		loss = 
 
