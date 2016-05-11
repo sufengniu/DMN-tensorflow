@@ -8,8 +8,8 @@ import numpy as np
 from six.moves import xrange 
 import tensorflow as tf
 
-import seq2seq
-import cell
+import models.seq2seq 
+import models.cell 
 
 class DMN(object):
 	"""
@@ -33,8 +33,9 @@ class DMN(object):
 	"""
 	def __init__(self, vocab_size, embedding_size, learning_rate, 
 		learning_rate_decay_op, memory_hops, dropout_rate, 
-		q_depth, a_depth, episodic_m_depth, ep_depth, 
-		maximum_story_length=50, maximum_question_length=30, use_lstm=False, forward_only=False):
+		q_depth, a_depth, episodic_m_depth, ep_depth,
+		m_input_size, max_gradient_norm, maximum_story_length=50,
+		maximum_question_length=30, use_lstm=False, forward_only=False):
 
 		# initialization
 		self.vocab_size = vocab_size
@@ -47,23 +48,23 @@ class DMN(object):
 		self.a_depth = a_depth	# answer RNN depth
 		self.m_depth = episodic_m_depth # memory cell depth
 		self.ep_depth = ep_depth	# episodic depth
-		
+		self.max_gradient_norm = max_gradient_norm
 		self.memory_hops = memory_hops	# number of episodic memory pass
 		self.m_input_size = m_input_size
 		self.m_size = embedding_size # memory cell size
 		self.a_size = embedding_size # answer RNN size
 
 
-		attention_ff_l1_size = attention_ff_l1_size
+		self.attention_ff_l1_size = attention_ff_l1_size
 		# attention_ff_l2_size 
 
 		self._ep_initial_state = cell.zero_state(batch_size, tf.float32)
 		
 		print("[*] Creating Dynamic Memory Network ...")
 		# question module
-		def seq2seq_f(encoder_inputs, mask=None, cell):
+		def seq2seq_f(encoder_inputs, cell, mask=None):
 			return seq2seq.sentence_embedding_rnn(
-				encoder_inputs, mask, self.vocab_size, cell, self.embedding_size)
+				encoder_inputs, self.vocab_size, cell, self.embedding_size, mask)
 		# attention gate in episodic
 		# TODO: force gate logits to be sparse, add L1 norm regularization
 		def feedfoward_nn(l1_input, input_size, l1_size, l2_size):
@@ -111,7 +112,7 @@ class DMN(object):
 		question_cell = single_cell
 		if q_depth > 1:
 			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell]*q_depth)
-		question = seq2seq.seq2seq_f(self.question,cell=question_cell):
+		question = seq2seq.seq2seq_f(self.question, question_cell)
 		self.question_state = tf.reshape(question, [self.embedding_size, 1])
 		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
@@ -137,7 +138,7 @@ class DMN(object):
 				fusion_bw_cell, output_keep_prob=dropout_rate)
 
 		(self.facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
-			lambda x: seq2seq_f(self.story, cell=reader_cell))
+			lambda x: seq2seq_f(self.story, reader_cell))
 
 
 		
@@ -219,10 +220,10 @@ class DMN(object):
 			optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
 			gradients = tf.gradients(self.loss, params)
 			clipped_gradients, norm = tf.clip_by_global_norm(gradients,
-				max_gradient_norm)
+				self.max_gradient_norm)
 			self.gradient_norms = norm
 			self.updates = optimizer.apply_gradients(
-				zip(clipped_gradients, params), global_step=self.global_step))
+				zip(clipped_gradients, params), global_step=self.global_step)
 		
 		self.saver = tf.train.Saver(tf.all_variables())
 

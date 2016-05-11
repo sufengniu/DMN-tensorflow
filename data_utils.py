@@ -97,7 +97,7 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
     if _vocab == _ivocab == None:
         vocab = {}
         ivocab = {}
-    elif _vocab == _ivocab:
+    elif len(_vocab) == len(_ivocab):
         vocab = _vocab
         ivocab = _ivocab
     else:
@@ -141,8 +141,8 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
 
 
 
-babi_train_raw, babi_validation_raw = get_babi_raw("1")
-t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = process_input(babi_train_raw)
+# babi_train_raw, babi_validation_raw = get_babi_raw("1")
+# t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = process_input(babi_train_raw)
 
 
 
