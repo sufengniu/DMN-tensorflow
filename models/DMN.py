@@ -50,13 +50,12 @@ class DMN(object):
 		
 		self.memory_hops = memory_hops	# number of episodic memory pass
 		self.m_input_size = m_input_size
-		self.m_size = episodic_m_size # memory cell size
-		self.a_size = a_size # answer RNN size
-		self.ep_size # episodic cell size
+		self.m_size = embedding_size # memory cell size
+		self.a_size = embedding_size # answer RNN size
 
-		attention_ff_size = attention_ff_size
+
 		attention_ff_l1_size = attention_ff_l1_size
-		attention_ff_l2_size = attention_ff_l2_size
+		# attention_ff_l2_size 
 
 		self._ep_initial_state = cell.zero_state(batch_size, tf.float32)
 		
@@ -89,23 +88,18 @@ class DMN(object):
 			self.question.append(tf.placeholder(tf.int32))
 		self.answer_labels = tf.placeholder(tf.int32)
 
+		story_len = tf.reshape(tf.shape(self.story_mask), [])
+
 		# configuration of attention gate
 		
-		with tf.variable_scope("episodic"):
-			# parameters of attention gate
-			l1_weights = tf.Variable(tf.truncated_normal([attention_ff_size, attention_ff_l1_size], -0.1, 0.1), name="l1_weights")
-			l1_biases = tf.Variable(tf.zeros([l1_size]), name="l1_biases")
-			l2_weights = tf.Variable(tf.truncated_normal([attention_ff_l1_size, attention_ff_l2_size], -0.1, 0.1), name="l2_weights")
-			l2_biases = tf.Variable(tf.zeros([l2_size]), name="l2_biases")
-			# paramters of episodic
-			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
-			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
+
 
 		with tf.variable_scope("answer"):
-			softmax_weights = tf.Variable(tf.truncated_normal([, ], -0.1, 0.1), name="softmax_weights")
+			softmax_weights = tf.Variable(tf.truncated_normal([self.a_size, self.vocab_size], -0.1, 0.1), name="softmax_weights")
+			softmax_biases = tf.Variable(tf.zeros([self.vocab_size]), name="softmax_biases")
 		
-		answer_weights = tf.Variable(tf.truncated_normal([, ], -0.1, 0.1), name="answer_weights")
-		answer_biases = tf.Variable(tf.zeros([vocab_size]), name="answer_biases")
+		answer_weights = tf.Variable(tf.truncated_normal([self.m_size, self.a_size], -0.1, 0.1), name="answer_weights")
+		answer_biases = tf.Variable(tf.zeros([self.a_size]), name="answer_biases")
 
 		#------------ question module ------------
 		single_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
@@ -117,8 +111,8 @@ class DMN(object):
 		question_cell = single_cell
 		if q_depth > 1:
 			question_cell = tf.nn.rnn_cell.MultiRNNCell([single_cell]*q_depth)
-		for question in	seq2seq.seq2seq_f(self.question,cell=question_cell):
-			self.question_state = question
+		question = seq2seq.seq2seq_f(self.question,cell=question_cell):
+		self.question_state = tf.reshape(question, [self.embedding_size, 1])
 		#self.question = tf.placeholder(tf.int32,[n_question, n_length])
 
 
@@ -126,29 +120,30 @@ class DMN(object):
 		reader_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		if use_lstm:
 			reader_cell = tf.nn.rnn_cell.BasicLSTMCell(self.embedding_size)
-		if not forward_only and dropout < 1:
+		if not forward_only and dropout_rate < 1:
 			reader_cell = tf.nn.rnn_cell.DropoutWrapper(
 				reader_cell, output_keep_prob=dropout_rate)
 		# Embedded toekn into vector, feed into rnn cell return cell state
-		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
-		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(embedding_size)
+		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
+		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		if use_lstm:
-			fusion_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
-			fusion_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(embedding_size)
+			fusion_fw_cell = tf.nn.rnn_cell.BasicLSTMCell(self.embedding_size)
+			fusion_bw_cell = tf.nn.rnn_cell.BasicLSTMCell(self.embedding_size)
 
-		if not forward_only and dropout < 1:
+		if not forward_only and dropout_rate < 1:
 			fusion_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
-				fusion_fw_cell, output_keep_prob=dropout)
+				fusion_fw_cell, output_keep_prob=dropout_rate)
 			fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
-				fusion_bw_cell, output_keep_prob=dropout)
+				fusion_bw_cell, output_keep_prob=dropout_rate)
 
-		self.facts = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
+		(self.facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
 			lambda x: seq2seq_f(self.story, cell=reader_cell))
 
 
 		
 		#------------ episodic memory module ------------
-		
+		# TODO: use self.facts to extract ep_size
+		self.ep_size = 2*self.embedding_size# episodic cell size
 		# construct memory cell
 		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.m_size)
 		#single_cell = cell.MemCell(self.m_size)
@@ -163,18 +158,37 @@ class DMN(object):
 			ep_cell.append(tf.nn.rnn_cell.MultiRNNCell([single_cell] * ep_depth))
 
 		e = []
+		mem_state = self.question_state
+		q_double = tf.concat(1, [self.question_state, self.question_state])
+		mem_state_double = tf.concat(1, [mem_state, mem_state])
+
+		z = tf.concat(1, [tf.mul(self.facts, q_double), tf.mul(self.facts, mem_state_double), 
+			tf.abs(tf.sub(self.facts, q_double)), tf.abs(tf.sub(self.facts, mem_state_double))])
+		z_dim = tf.shape(z)
+		attention_ff_size = z_dim[0]
+		attention_ff_l2_size = story_len
+		# initialize parameters	
+		with tf.variable_scope("episodic"):
+			# parameters of attention gate
+			l1_weights = tf.Variable(tf.truncated_normal([attention_ff_size, attention_ff_l1_size], -0.1, 0.1), name="l1_weights")
+			l1_biases = tf.Variable(tf.zeros([l1_size]), name="l1_biases")
+			l2_weights = tf.Variable(tf.truncated_normal([attention_ff_l1_size, attention_ff_l2_size], -0.1, 0.1), name="l2_weights")
+			l2_biases = tf.Variable(tf.zeros([l2_size]), name="l2_biases")
+			# paramters of episodic
+			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
+			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
+
 		for hops in xrange(self.memory_hops):
 			# gate attention network
-			z = tf.concat(0, [tf.mul(self.facts, q), tf.mul(self.facts, mem_state), 
-				tf.abs(tf.sub(self.facts, q)), tf.abs(tf.sub(self.facts, mem_state))])
+			
+			z = tf.concat(1, [tf.mul(self.facts, q_double), tf.mul(self.facts, mem_state_double), 
+				tf.abs(tf.sub(self.facts, q_double)), tf.abs(tf.sub(self.facts, mem_state_double))])
 			episodic_gate = feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
 			# attention GRU
 			output, context = cell.rnn(ep_cell[hops], self.facts, episodic_gate, initial_state=self._ep_initial_state, 
 				scope="epsodic")
 			e.append(output)
 			# memory updates
-			if hops is 0:
-				mem_state = self.question_state
 			#_, mem_state = mem_cell(context_state, mem_state)	# GRU
 			_, mem_state = mem_cell(context, self.question_state, mem_state, self.m_input_size, self.m_size)
 			# if the attentioned module is last e, it means the episodic pass is over
@@ -191,8 +205,8 @@ class DMN(object):
 		a_state = mem_state
 		for step in range(answer_steps):
 			y = tf.nn.softmax(tf.matmul(a_state, answer_weights))
-			(answer, a_state) = answer_cell(tf.concat(0, [self.question_state, y]), a_state)
-			#(answer, a_state) = answer_cell(tf.concat(0, [question, mem_state]), a_state)
+			(answer, a_state) = answer_cell(tf.concat(1, [self.question_state, y]), a_state)
+			#(answer, a_state) = answer_cell(tf.concat(1, [question, mem_state]), a_state)
 
 		self.logits = tf.matmul(answer, softmax_weights)+softmax_biases
 		self.loss = tf.reduce_mean(

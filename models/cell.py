@@ -80,7 +80,7 @@ class MemCell(rnn_cell.RNNCell):
 		with tf.variable_scope("episodic"):
 			mem_weights = get_variable("mem_weights", [m_input_size, _num_units])
 			mem_bias = get_variable("mem_biases", [_num_units])
-		new_state = tf.nn.relu(tf.matmul(tf.concat(0, [state, inputs, question]), mem_weights) + mem_biases)
+		new_state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights) + mem_biases)
 		return new_state
 
 def rnn(cell, inputs, episodic_gate, initial_state=None, dtype=None,
