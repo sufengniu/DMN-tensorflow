@@ -22,25 +22,58 @@ from tensorflow.python.ops import variable_scope
 
 
 
-def sentence_embedding_rnn(_encoder_inputs, vocab_size, cell, 
+def sentence_embedding_rnn_q(_encoder_inputs, vocab_size, cell, 
 	embedding_size, mask=None, dtype=dtypes.float32, scope=None):
 	"""
 	
 	"""
 	with variable_scope.variable_scope(scope or "embedding_rnn"):
 		encoder_cell = rnn_cell.EmbeddingWrapper(
-				cell, embedding_class=vocab_size,
+				cell, embedding_classes=vocab_size,
 				embedding_size=embedding_size)
 		# Divde encoder_inputs by given input_mask
 		if mask != None:
-			encoder_input = [[] for _ in mask]
+			encoder_inputs = [[] for _ in mask]
 			_mask = 0
 			for num in range(len(_encoder_inputs)):
-				encoder_input[_mask].append(_encoder_inputs[num])
+				encoder_inputs[_mask].append(_encoder_inputs[num])
 				if num == mask[_mask]:
 					_mask += 1
 		else:
-			encoder_input = [_encoder_inputs]
+			encoder_inputs = []
+			encoder_inputs.append(_encoder_inputs)
+		encoder_state = None	 
+		encoder_states = []
+		for encoder_input in encoder_inputs:
+			if encoder_state == None:
+				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, dtype=dtype)
+			else:
+				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
+			encoder_states.append(encoder_state)
+	print (encoder_states) 
+	return encoder_states
+
+
+def sentence_embedding_rnn_s(_encoder_inputs, vocab_size, cell, 
+	embedding_size, mask=None, dtype=dtypes.float32, scope=None):
+	"""
+	
+	"""
+	with variable_scope.variable_scope(scope or "embedding_rnn", reuse=True):
+		encoder_cell = rnn_cell.EmbeddingWrapper(
+				cell, embedding_classes=vocab_size,
+				embedding_size=embedding_size)
+		# Divde encoder_inputs by given input_mask
+		if mask != None:
+			encoder_inputs = [[] for _ in mask]
+			_mask = 0
+			for num in range(len(_encoder_inputs)):
+				encoder_inputs[_mask].append(_encoder_inputs[num])
+				if num == mask[_mask]:
+					_mask += 1
+		else:
+			encoder_inputs = []
+			encoder_inputs.append(_encoder_inputs)
 		encoder_state = None	 
 		encoder_states = []
 		for encoder_input in encoder_inputs:
@@ -50,7 +83,4 @@ def sentence_embedding_rnn(_encoder_inputs, vocab_size, cell,
 				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
 			encoder_states.append(encoder_state)
 	return encoder_states
-
-
-
 

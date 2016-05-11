@@ -30,6 +30,7 @@ flags.DEFINE_integer("a_depth", 1, "answer module depth")
 flags.DEFINE_integer("episodic_m_depth", 1, "memory update module depth")
 flags.DEFINE_integer("ep_depth", 1, "episodic module depth")
 flags.DEFINE_integer("m_input_size", 300, "context vector size in episodic module")
+flags.DEFINE_integer("attention_ff_l1_size", 100, "episodic gating neural network first layer size")
 flags.DEFINE_integer("maximum_story_length", 50, "max story length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 10, "max memoy hops")
@@ -66,6 +67,7 @@ def create_model(session, forward_only):
 		FLAGS.episodic_m_depth,
 		FLAGS.ep_depth,
 		FLAGS.m_input_size,
+		FLAGS.attention_ff_l1_size,
 		FLAGS.max_gradient_norm,
 		FLAGS.maximum_story_length,
 		FLAGS.maximum_question_length,
