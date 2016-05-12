@@ -50,7 +50,6 @@ def sentence_embedding_rnn_q(_encoder_inputs, vocab_size, cell,
 			else:
 				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
 			encoder_states.append(encoder_state)
-	print (encoder_states) 
 	return encoder_states
 
 
