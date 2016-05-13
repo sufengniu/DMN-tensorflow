@@ -35,7 +35,7 @@ class DMN(object):
 	def __init__(self, vocab_size, embedding_size, learning_rate, 
 		learning_rate_decay_op, memory_hops, dropout_rate, 
 		q_depth, a_depth, episodic_m_depth, ep_depth,
-		m_input_size, attention_ff_l1_size, max_gradient_norm, maximum_story_length=50,
+		m_input_size, attention_ff_l1_size, max_gradient_norm, maximum_story_length=100,
 		maximum_question_length=20, use_lstm=False, forward_only=False):
 
 		# initialization
@@ -96,13 +96,14 @@ class DMN(object):
 			self.story.append(tf.placeholder(tf.int32, shape=[None], 
 												name="story{0}".format(i)))
 		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
-		self.story_len = tf.Variable(0)
+		self.story_len = tf.placeholder(tf.int32, shape=[None], name="story_len")
 		self.question = []
 		for i in range(maximum_question_length):
 			self.question.append(tf.placeholder(tf.int32, shape=[None], name="question{0}".format(i)))
 		self.answer = tf.placeholder(tf.int64, name="answer")
 
-		self.story_len = 6#= tf.reshape(tf.shape(self.story_mask), [])
+		# self.story_len = 1#= tf.reshape(tf.shape(self.story_mask), [])
+		# TODO: fixed lens problem
 		#self.story_len = 5
 
 		# configuration of attention gate
@@ -204,8 +205,10 @@ class DMN(object):
 		for hops in xrange(self.memory_hops):
 			for step in xrange(self.story_len):
 				# gate attention network
+				print (self.facts[step, :])
 				z = tf.concat(1, [tf.mul(self.facts[step, :], q_double), tf.mul(self.facts[step, :], mem_state_double), 
 					tf.abs(tf.sub(self.facts[step, :], q_double)), tf.abs(tf.sub(self.facts[step, :], mem_state_double))])
+
 				episodic_gate.append(feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size))
 			
 			# attention GRU
@@ -236,9 +239,9 @@ class DMN(object):
 			#(answer, a_state) = answer_cell(tf.concat(1, [question, mem_state]), a_state)
 
 		self.logits = tf.nn.softmax(tf.matmul(answer, softmax_weights)+softmax_biases)
-
+		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
 		self.loss = tf.reduce_mean(
-			tf.nn.softmax_cross_entropy_with_logits(self.logits, tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0)))
+			tf.nn.softmax_cross_entropy_with_logits(self.logits, answer))
 		
 		params = tf.trainable_variables()
 		if not forward_only:
@@ -258,8 +261,9 @@ class DMN(object):
 		input_feed = {}
 		for l in range(len(story)):
 			input_feed[self.story[l].name] = [story[l]]
-		for l in range(len(story),50):
+		for l in range(len(story),100):
 			input_feed[self.story[l].name] = [0]
+		input_feed[self.story_len.name]= len(story_mask)
 		for l in range(len(question)):
 			input_feed[self.question[l].name] = [question[l]]
 		for l in range(len(question),20):
