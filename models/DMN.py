@@ -36,7 +36,7 @@ class DMN(object):
 		learning_rate_decay_op, memory_hops, dropout_rate, 
 		q_depth, a_depth, episodic_m_depth, ep_depth,
 		m_input_size, attention_ff_l1_size, max_gradient_norm, maximum_story_length=50,
-		maximum_question_length=30, use_lstm=False, forward_only=False):
+		maximum_question_length=20, use_lstm=False, forward_only=False):
 
 		# initialization
 		self.vocab_size = vocab_size
@@ -93,13 +93,14 @@ class DMN(object):
 		# Sentence token placeholder
 		self.story = []
 		for i in range(maximum_story_length):
-			self.story.append(tf.placeholder(tf.int32, shape=[1]))
-		self.story_mask = tf.placeholder(tf.int32, shape=[10])
+			self.story.append(tf.placeholder(tf.int32, shape=[None], 
+												name="story{0}".format(i)))
+		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
 		self.story_len = tf.Variable(0)
 		self.question = []
 		for i in range(maximum_question_length):
-			self.question.append(tf.placeholder(tf.int32, shape=[1]))
-		self.answer = tf.placeholder(tf.int64)
+			self.question.append(tf.placeholder(tf.int32, shape=[None], name="question{0}".format(i)))
+		self.answer = tf.placeholder(tf.int64, name="answer")
 
 		self.story_len = 6#= tf.reshape(tf.shape(self.story_mask), [])
 		#self.story_len = 5
@@ -154,7 +155,6 @@ class DMN(object):
 
 		(_facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
 			seq2seq_fs(self.story, reader_cell),dtype=tf.float32)
-		print(_facts)
 
 		self.facts = _facts[0]
 
@@ -198,7 +198,7 @@ class DMN(object):
 			# paramters of episodic
 			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
 			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
-		print (self.facts)
+
 		episodic_gate = []
 		def_feedfoward_nn(attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
 		for hops in xrange(self.memory_hops):
@@ -236,7 +236,7 @@ class DMN(object):
 			#(answer, a_state) = answer_cell(tf.concat(1, [question, mem_state]), a_state)
 
 		self.logits = tf.nn.softmax(tf.matmul(answer, softmax_weights)+softmax_biases)
-		print (self.answer)
+
 		self.loss = tf.reduce_mean(
 			tf.nn.softmax_cross_entropy_with_logits(self.logits, tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0)))
 		
@@ -257,19 +257,23 @@ class DMN(object):
 	def step(self, session, story, story_mask, question, answer, forward_only):
 		input_feed = {}
 		for l in range(len(story)):
-			input_feed[self.story[l].name] = story[l]
+			input_feed[self.story[l].name] = [story[l]]
+		for l in range(len(story),50):
+			input_feed[self.story[l].name] = [0]
 		for l in range(len(question)):
-			input_feed[self.question[l].name] = question[l]
-		for l in range(len(answer)):
-			input_feed[self.answer[l].name] = answer[l]
+			input_feed[self.question[l].name] = [question[l]]
+		for l in range(len(question),20):
+			input_feed[self.question[l].name] = [0]
+		# for l in range(len([answer])):
+		input_feed[self.answer.name] = answer
 		input_feed[self.story_mask.name] = story_mask
-		input_feed[self.story_len.name] = len(story_mask)
+		# input_feed[self.story_len.name] = len(story_mask)
 
 
 		if not forward_only:
 			output_feed = [self.updates,	# Update Op that does SGD.
 							self.gradient_norms,	# Gradient norm.
-							self.losses]	# Loss for this batch.
+							self.loss]	# Loss for this batch.
 		else:
 			output_feed = [self.loss,		# Loss for this batch.
 							tf.argmax(self.logits, 0)]
