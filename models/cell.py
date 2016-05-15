@@ -61,8 +61,8 @@ class MGRUCell(rnn_cell.RNNCell):
 				r = sigmoid(r)
 			with vs.variable_scope("Candidate"):
 				c = tanh(rnn_cell.linear([inputs, r * state], self._num_units, True))
-			for f in xrange(len(episodic_gate)):
-				new_h = episodic_gate[f] * c + (1 - episodic_gate[f]) * state
+			
+			new_h = episodic_gate * c + (1 - episodic_gate) * state
 		return new_h, new_h
 
 class MemCell(rnn_cell.RNNCell):
