@@ -96,7 +96,8 @@ class DMN(object):
 			self.story.append(tf.placeholder(tf.int32, shape=[None], 
 												name="story{0}".format(i)))
 		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
-		self.story_len = tf.placeholder(tf.int32, shape=[None], name="story_len")
+		self.story_len = tf.identity(self.story_mask)
+		print (self.story_len)
 		self.question = []
 		for i in range(maximum_question_length):
 			self.question.append(tf.placeholder(tf.int32, shape=[None], name="question{0}".format(i)))
@@ -184,7 +185,7 @@ class DMN(object):
 		# TODO change z_dim to be 
 		z_dim = self.embedding_size * 8
 		attention_ff_size = z_dim
-		attention_ff_l2_size = self.ep_size
+		attention_ff_l2_size = self.story_len
 		# self._ep_initial_state = []
 		# for _cell in range(ep_cell)
 		# 	self._ep_initial_state.append = _cell.zero_state(1, tf.float32)	# TODO change batch size
@@ -200,20 +201,26 @@ class DMN(object):
 			mem_weights = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1), name="mem_weights")
 			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
 
-		episodic_gate = []
-		def_feedfoward_nn(attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
-		for hops in xrange(self.memory_hops):
-			for step in xrange(self.story_len):
-				# gate attention network
-				print (self.facts[step, :])
-				z = tf.concat(1, [tf.mul(self.facts[step, :], q_double), tf.mul(self.facts[step, :], mem_state_double), 
-					tf.abs(tf.sub(self.facts[step, :], q_double)), tf.abs(tf.sub(self.facts[step, :], mem_state_double))])
+		def mem_body(self, step, story_len, facts, q_double, mem_state_double):
+			z = tf.concat(1, [tf.mul(facts[step, :], q_double), tf.mul(facts[step, :], mem_state_double), 
+				tf.abs(tf.sub(facts[step, :], q_double)), tf.abs(tf.sub(facts[step, :], mem_state_double))])
 
-				episodic_gate.append(feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size))
-			
+			self.episodic_gate = feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
+			step += 1
+			return step
+		# initializing variable of feedforward nn
+		def_feedfoward_nn(attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
+
+		for hops in xrange(self.memory_hops):
+				# gate attention network
+
+			step = tf.constant(0)
+			tf.while_loop(lambda step, story_len: tf.less(step,story_len),
+				lambda step, story_len, facts, q_double, mem_state_double: self.mem_body(step, facts, q_double, mem_state_double),
+				[step, self.story_len, self.facts, q_double, mem_state_double])
 			# attention GRU
-			# output, context = cell.rnn(ep_cell[hops], [self.facts], episodic_gate, scope="epsodic", dtype=tf.float32)
-			output, context = cell.rnn_ep(ep_cell, [self.facts], episodic_gate, dtype=tf.float32, scope="episodic")
+			# output, context = cell.rnn(ep_cell[hops], [self.facts], self.episodic_gate, scope="epsodic", dtype=tf.float32)
+			output, context = cell.rnn_ep(ep_cell, [self.facts], self.episodic_gate, dtype=tf.float32, scope="episodic")
 			e.append(output)
 			# memory updates
 			#_, mem_state = mem_cell(context_state, mem_state)	# GRU
@@ -223,7 +230,8 @@ class DMN(object):
 			# if the attentioned module is last e, it means the episodic pass is over
 			if np.argmax(np.asarray(e[-1])) == len(e[-1])-1:
 				break
-
+			
+			
 		#------------ answer ------------
 		# TODO: use decoder sequence to generate answer
 		answer_steps = 1
@@ -263,7 +271,7 @@ class DMN(object):
 			input_feed[self.story[l].name] = [story[l]]
 		for l in range(len(story),100):
 			input_feed[self.story[l].name] = [0]
-		input_feed[self.story_len.name]= len(story_mask)
+		# input_feed[self.story_len_.name]= len(story_mask)
 		for l in range(len(question)):
 			input_feed[self.question[l].name] = [question[l]]
 		for l in range(len(question),20):
