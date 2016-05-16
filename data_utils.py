@@ -95,8 +95,8 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
     fact_counts = []
     input_masks = []
     if _vocab == _ivocab == None:
-        vocab = {}
-        ivocab = {}
+        vocab = {0:"NIL"}
+        ivocab = {"NIL":0}
     elif len(_vocab) == len(_ivocab):
         vocab = _vocab
         ivocab = _ivocab

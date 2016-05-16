@@ -96,7 +96,7 @@ class DMN(object):
 			self.story.append(tf.placeholder(tf.int32, shape=[None], 
 												name="story{0}".format(i)))
 		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
-		self.story_len = tf.identity(self.story_mask)
+		self.story_len = tf.placeholder(tf.int32, shape=[0], name="story length")
 		print (self.story_len)
 		self.question = []
 		for i in range(maximum_question_length):
@@ -215,7 +215,7 @@ class DMN(object):
 				# gate attention network
 
 			step = tf.constant(0)
-			tf.while_loop(lambda step, story_len: tf.less(step,story_len),
+			tf.while_loop(lambda step, story_len, facts, q_double, mem_state_double: tf.less(step,story_len),
 				lambda step, story_len, facts, q_double, mem_state_double: self.mem_body(step, facts, q_double, mem_state_double),
 				[step, self.story_len, self.facts, q_double, mem_state_double])
 			# attention GRU
@@ -279,9 +279,9 @@ class DMN(object):
 		# for l in range(len([answer])):
 		input_feed[self.answer.name] = answer
 		input_feed[self.story_mask.name] = story_mask
-		# input_feed[self.story_len.name] = len(story_mask)
+		input_feed[self.story_len.name] = len(story_mask)
 
-
+		print ("---------------------", session.run(self.story_len))
 		if not forward_only:
 			output_feed = [self.updates,	# Update Op that does SGD.
 							self.gradient_norms,	# Gradient norm.

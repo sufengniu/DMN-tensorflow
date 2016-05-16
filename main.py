@@ -31,7 +31,7 @@ flags.DEFINE_integer("episodic_m_depth", 1, "memory update module depth")
 flags.DEFINE_integer("ep_depth", 1, "episodic module depth")
 flags.DEFINE_integer("m_input_size", 1200, "[m; c; q] concatenate in episodic module")
 flags.DEFINE_integer("attention_ff_l1_size", 100, "episodic gating neural network first layer size")
-flags.DEFINE_integer("maximum_story_length", 50, "max story length")
+flags.DEFINE_integer("maximum_story_length", 100, "max story length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 10, "max memoy hops")
 
@@ -97,7 +97,7 @@ def train():
 		current_step = 0
 		previous_losses = []
 		for i in range(500):
-			_, loss = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
+			_, loss, _ = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
 			print (loss)	
 
 
