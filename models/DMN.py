@@ -29,7 +29,7 @@ class DMN(object):
 
 
 		Returns:
-
+			built model of dynamic memory network
 
 	"""
 	def __init__(self, vocab_size, embedding_size, learning_rate, 
@@ -85,8 +85,8 @@ class DMN(object):
 				l2_biases = tf.get_variable("l2_biases", [l2_size])
 
 			l2_input = tf.tanh(tf.matmul(l1_input , l1_weights) + l1_biases)
-			logits = tf.matmul(l2_input , l2_weights) + l2_biases
-			gate_prediction = tf.nn.softmax(logits)
+			gate_prediction = tf.matmul(l2_input , l2_weights) + l2_biases
+		
 			return gate_prediction
 
 
@@ -170,6 +170,7 @@ class DMN(object):
 		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.m_size)
 		mem_cell = cell.MemCell(self.m_size)
 		#mem_cell = tf.nn.rnn_cell.GRUCell(self.m_size)
+		self.episodic_array = []
 
 		# construct episodic_cell
 
@@ -204,20 +205,24 @@ class DMN(object):
 		def mem_body(self, step, story_len, facts, q_double, mem_state_double):
 			z = tf.concat(1, [tf.mul(facts[step, :], q_double), tf.mul(facts[step, :], mem_state_double), 
 				tf.abs(tf.sub(facts[step, :], q_double)), tf.abs(tf.sub(facts[step, :], mem_state_double))])
-
-			self.episodic_gate = feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
+			# record Z (all episodic memory states)
+			self.episodic_array.append(feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size))
+			
 			step += 1
 			return step
 		# initializing variable of feedforward nn
 		def_feedfoward_nn(attention_ff_size, attention_ff_l1_size, attention_ff_l2_size)
 
 		for hops in xrange(self.memory_hops):
-				# gate attention network
+			# gate attention network
 
 			step = tf.constant(0)
 			tf.while_loop(lambda step, story_len: tf.less(step,story_len),
 				lambda step, story_len, facts, q_double, mem_state_double: self.mem_body(step, facts, q_double, mem_state_double),
-				[step, self.story_len, self.facts, q_double, mem_state_double])
+				[step, self.story_len, self.facts, q_double, mem_state_double])		
+		
+			self.spisodic_gate = tf.nn.softmax(self.episodic_array)
+
 			# attention GRU
 			# output, context = cell.rnn(ep_cell[hops], [self.facts], self.episodic_gate, scope="epsodic", dtype=tf.float32)
 			output, context = cell.rnn_ep(ep_cell, [self.facts], self.episodic_gate, dtype=tf.float32, scope="episodic")
