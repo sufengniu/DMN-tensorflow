@@ -9,6 +9,7 @@ from __future__ import print_function
 from six.moves import xrange  # pylint: disable=redefined-builtin
 from six.moves import zip	 # pylint: disable=redefined-builtin
 
+import tensorflow as tf
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
@@ -82,4 +83,21 @@ def sentence_embedding_rnn_s(_encoder_inputs, vocab_size, cell,
 				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
 			encoder_states.append(encoder_state)
 	return encoder_states
+
+def def_feedfoward_nn(input_size, l1_size, l2_size):
+	with tf.variable_scope("episodic"):
+		l1_weights = tf.get_variable("l1_weights", [input_size, l1_size])
+		l1_biases = tf.get_variable("l1_biases", [l1_size])
+		l2_weights = tf.get_variable("l2_weights", [l1_size, l2_size])
+		l2_biases = tf.get_variable("l2_biases", [l2_size])
+def feedfoward_nn(l1_input, input_size, l1_size, l2_size):
+	with tf.variable_scope("episodic", reuse=True):
+		l1_weights = tf.get_variable("l1_weights", [input_size, l1_size])
+		l1_biases = tf.get_variable("l1_biases", [l1_size])
+		l2_weights = tf.get_variable("l2_weights", [l1_size, l2_size])
+		l2_biases = tf.get_variable("l2_biases", [l2_size])
+		l2_input = tf.tanh(tf.matmul(l1_input , l1_weights) + l1_biases)
+		gate_prediction = tf.matmul(l2_input , l2_weights) + l2_biases
+	
+		return gate_prediction
 
