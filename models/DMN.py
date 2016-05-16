@@ -186,7 +186,7 @@ class DMN(object):
 		# TODO change z_dim to be 
 		z_dim = self.embedding_size * 8
 		attention_ff_size = z_dim
-		attention_ff_l2_size = self.story_len
+		attention_ff_l2_size = self.embedding_size 
 		# self._ep_initial_state = []
 		# for _cell in range(ep_cell)
 		# 	self._ep_initial_state.append = _cell.zero_state(1, tf.float32)	# TODO change batch size
@@ -203,9 +203,11 @@ class DMN(object):
 			mem_biases = tf.Variable(tf.zeros([self.m_size]), name="mem_biases")
 
 		def mem_body(self, step, story_len, facts, q_double, mem_state_double):
+			print("=++++++++++++++++")
 			z = tf.concat(1, [tf.mul(facts[step, :], q_double), tf.mul(facts[step, :], mem_state_double), 
 				tf.abs(tf.sub(facts[step, :], q_double)), tf.abs(tf.sub(facts[step, :], mem_state_double))])
 			# record Z (all episodic memory states)
+			print("-----------------")
 			self.episodic_array.append(feedfoward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size))
 			
 			step += 1
@@ -217,7 +219,7 @@ class DMN(object):
 			# gate attention network
 
 			step = tf.constant(0)
-			tf.while_loop(lambda step, story_len: tf.less(step,story_len),
+			tf.while_loop(lambda step, story_len, facts, q_double, mem_state_double: tf.less(step, story_len),
 				lambda step, story_len, facts, q_double, mem_state_double: self.mem_body(step, facts, q_double, mem_state_double),
 				[step, self.story_len, self.facts, q_double, mem_state_double])		
 		
