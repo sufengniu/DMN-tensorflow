@@ -156,7 +156,7 @@ class DMN(object):
 		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.m_size)
 		mem_cell = cell.MemCell(self.m_size)
 		#mem_cell = tf.nn.rnn_cell.GRUCell(self.m_size)
-		self.episodic_array = tf.Variable([0],tf.float32)
+		self.episodic_array = tf.Variable(tf.random_normal([1,1]))
 
 		# construct episodic_cell
 
@@ -197,11 +197,11 @@ class DMN(object):
 			step = tf.constant(0)
 			tf.while_loop(lambda step, story_len, facts, q_double, mem_state_double: tf.less(step, story_len),
 				lambda step, story_len, facts, q_double, mem_state_double: self.mem_body(step, story_len, facts, q_double, mem_state_double),
-				[step, self.story_len, self.facts, q_double, mem_state_double])		
+				[step, self.story_len, self.facts, q_double, mem_state_double])	
 
-
-
-			self.episodic_gate = tf.nn.softmax(self.episodic_array)
+			#self.episodic_gate = tf.reshape(tf.nn.softmax(self.episodic_array),[1])
+			self.episodic_gate = tf.nn.softmax(tf.reshape(self.episodic_array, [1,-1]))
+			print ("episodic_gate",self.episodic_gate)
 
 			# attention GRU
 			# output, context = cell.rnn(ep_cell[hops], [self.facts], self.episodic_gate, scope="epsodic", dtype=tf.float32)
@@ -235,8 +235,12 @@ class DMN(object):
 		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
 		self.loss = tf.reduce_mean(
 			tf.nn.softmax_cross_entropy_with_logits(self.logits, answer))
+
 		
 		params = tf.trainable_variables()
+		# testing
+		for e in params:
+			print(e.get_shape(), e.name, type(e))
 		if not forward_only:
 			self.gradient_norms = []
 			self.updates = []
@@ -302,8 +306,9 @@ class DMN(object):
 		# record Z (all episodic memory states)
 		def f1(): return seq2seq.feedfoward_nn(z, self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size)
 		def f2(): return tf.concat(0, [tf.reshape(tf.to_float(self.episodic_array),[-1]), tf.reshape(seq2seq.feedfoward_nn(z, self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size),[-1])])
-		print (self.episodic_array)
+		
 		self.episodic_array = tf.cond(tf.less(step,1), f1, f2)
-
+		print (self.episodic_array)
+		print ('=-=-=-=-=', tf.to_float(self.episodic_array), seq2seq.feedfoward_nn(z, self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size))
 		step =tf.add(step, 1)
 		return step, story_len, facts, q_double, mem_state_double

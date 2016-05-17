@@ -97,7 +97,7 @@ def feedfoward_nn(l1_input, input_size, l1_size, l2_size):
 		l2_weights = tf.get_variable("l2_weights", [l1_size, l2_size])
 		l2_biases = tf.get_variable("l2_biases", [l2_size])
 		l2_input = tf.tanh(tf.matmul(l1_input , l1_weights) + l1_biases)
-		gate_prediction = tf.matmul(l2_input , l2_weights) + l2_biases
-	
+		gate_prediction = tf.reshape(tf.matmul(l2_input , l2_weights) + l2_biases,[1,])
+		print ('prediction:',gate_prediction)
 		return gate_prediction
 
