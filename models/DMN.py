@@ -53,6 +53,7 @@ class DMN(object):
 		self.memory_hops = memory_hops	# number of episodic memory pass
 		self.m_input_size = m_input_size
 		self.m_size = embedding_size # memory cell size
+		self.a_size = embedding_size
 		self.attention_ff_l1_size = attention_ff_l1_size 
 
 		
@@ -98,7 +99,7 @@ class DMN(object):
 		softmax_biases = tf.Variable(tf.zeros([self.vocab_size]), name="softmax_biases")
 		
 		answer_weights = tf.Variable(tf.truncated_normal([self.m_size, self.a_size], -0.1, 0.1), name="answer_weights")
-		answer_biases = tf.Variable(tf.zeros([self.a_size]), name="answer_biases")
+		# answer_biases = tf.Variable(tf.zeros([self.a_size]), name="answer_biases")
 
 		#------------ question module ------------
 		embedding_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
@@ -246,18 +247,19 @@ class DMN(object):
 		#------------ answer ------------
 		# TODO: use decoder sequence to generate answer
 		answer_steps = 1
-		# single_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		# answer_cell = single_cell
-		# if a_depth > 1:
-		# 	answer_cell =tf.nn.rnn_cell.MultiRNNCell([single_cell] * a_depth)
+		single_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
+		answer_cell = single_cell
+		if a_depth > 1:
+			answer_cell =tf.nn.rnn_cell.MultiRNNCell([single_cell] * a_depth)
 		
 		a_state = mem_state
 		for step in range(answer_steps):
-			y = tf.nn.softmax(tf.matmul(a_state, answer_weights) + answer_biases)
+			y = tf.nn.softmax(tf.matmul(a_state, answer_weights))
 			(answer, a_state) = answer_cell(tf.concat(1, [self.question_state, y]), a_state)
 			#(answer, a_state) = answer_cell(tf.concat(1, [question, mem_state]), a_state)
 
 		self.logits = tf.nn.softmax(tf.matmul(answer, softmax_weights)+softmax_biases)
+
 		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
 		self.loss = tf.reduce_mean(
 			tf.nn.softmax_cross_entropy_with_logits(self.logits, answer))
@@ -297,7 +299,8 @@ class DMN(object):
 		input_feed[self.story_len.name] = len(story_mask)
 
 		if not forward_only:
-			output_feed = [self.updates,	# Update Op that does SGD.
+			output_feed = [self.logits,
+							self.updates,	# Update Op that does SGD.
 							self.gradient_norms,	# Gradient norm.
 							self.loss]	# Loss for this batch.
 		else:

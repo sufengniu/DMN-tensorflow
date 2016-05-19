@@ -32,10 +32,11 @@ flags.DEFINE_integer("ep_depth", 1, "episodic module depth")
 flags.DEFINE_integer("m_input_size", 1200, "[m; c; q] concatenate in episodic module")
 flags.DEFINE_integer("attention_ff_l1_size", 100, "episodic gating neural network first layer size")
 flags.DEFINE_integer("maximum_story_length", 100, "max story length")
+flags.DEFINE_integer("maximum_attention_length", 15, "max attetion length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 10, "max memoy hops")
 
-flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
+flags.DEFINE_float("learning_rate", 0.005, "Learning rate.")
 flags.DEFINE_float("learning_rate_decay_op", 0.99, "Learning rate decay.")
 flags.DEFINE_float("dropout_rate", 0.5, "dropout rates")
 flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
@@ -50,6 +51,7 @@ flags.DEFINE_integer("steps_per_checkpoint", 50, "How many training steps to do 
 # flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
 flags.DEFINE_string("data_type", "1", "choose babi_map, check data_utils for detail")
+
 FLAGS = flags.FLAGS
 
 
@@ -71,6 +73,7 @@ def create_model(session, forward_only):
 		FLAGS.max_gradient_norm,
 		FLAGS.maximum_story_length,
 		FLAGS.maximum_question_length,
+		# FLAGS.maximum_attention_length,
 		use_lstm=FLAGS.use_lstm,
 		forward_only=False)
 	ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
@@ -90,15 +93,19 @@ def train():
 		v_context, v_questions, v_answers, v_fact_counts, v_input_masks, vocab, ivocab = data_utils.process_input(babi_validation_raw, vocab, ivocab)
 	else:
 		raise Exception ("Only joint mode is allowed")
-	
-	with tf.Session() as sess:
-		model = create_model(sess, False)
-		step_time, loss = 0.0, 0.0
-		current_step = 0
-		previous_losses = []
-		for i in range(500):
-			_, loss, _ = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
-			print (loss)	
+	with tf.Graph().as_default():
+		with tf.Session() as sess:
+			model = create_model(sess, False)
+			step_time, loss = 0.0, 0.0
+			current_step = 0
+			previous_losses = []
+			for j in range(50):
+				for i in range(999):
+					# _, loss, _ = 
+					loss = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
+					print (loss)	
+					print (len(loss[0][0]))
+					# writer = tf.train.SummaryWriter("./tensorboard", sess.graph_def)
 
 
 def test():
