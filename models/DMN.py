@@ -55,17 +55,15 @@ class DMN(object):
 		self.m_size = embedding_size # memory cell size
 		self.a_size = embedding_size
 		self.attention_ff_l1_size = attention_ff_l1_size 
-
-		
-
-
-
-
-
-		
+		self.maximum_story_length = maximum_story_length
+				
 		
 		print("[*] Creating Dynamic Memory Network ...")
-
+		# Initializing word2vec
+		W = tf.Variable(tf.constant(0.0, shape=[vocab_size, embedding_size]),
+                trainable=False, name="W")
+		embedding_placeholder = tf.placeholder(tf.float32, [vocab_size, embedding_size])
+		embedding_init = W.assign(embedding_placeholder)
 		# question module
 		def seq2seq_f(encoder_inputs, cell, mask=None, reuse=None):
 			return seq2seq.sentence_embedding_rnn(
@@ -76,7 +74,7 @@ class DMN(object):
 
 		# Sentence token placeholder
 		self.story = []
-		for i in range(maximum_story_length):
+		for i in range(self.maximum_story_length):
 			self.story.append(tf.placeholder(tf.int32, shape=[None], 
 												name="story{0}".format(i)))
 		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
@@ -143,11 +141,12 @@ class DMN(object):
 			fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
 				fusion_bw_cell, output_keep_prob=dropout_rate)
 
+		# testing 
+		self.story_vec = seq2seq_f(self.story, embedding_cell, reuse=True)
 		(_facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell,
-			seq2seq_f(self.story, embedding_cell, reuse=True),dtype=tf.float32)
+			seq2seq_f(self.story, embedding_cell, self.story_mask, reuse=True),dtype=tf.float32)
 
-		self.facts = _facts[0]
-
+		self.facts = tf.concat(1, _facts)
 
 
 
@@ -209,22 +208,25 @@ class DMN(object):
 		# seq2seq.def_feedforward_nn(self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size)
 		episodic_array = []
 
-		def mem_body(step, story_len, facts, q_double, mem_state_double):
-			z = tf.concat(1, [tf.mul(tf.gather(facts, step), q_double), tf.mul(tf.gather(facts, step), mem_state_double), 
-				tf.abs(tf.sub(tf.gather(facts, step), q_double)), tf.abs(tf.sub(tf.gather(facts, step), mem_state_double))])
+		def mem_body(step, story_len, q_double, mem_state_double):
+			print ("-------------")
+			print (tf.gather(self.facts, step))
+			print ("+++++++++++++")
+			z = tf.concat(1, [tf.mul(tf.gather(self.facts, step), q_double), tf.mul(tf.gather(self.facts, step), mem_state_double), 
+				tf.abs(tf.sub(tf.gather(self.facts, step), q_double)), tf.abs(tf.sub(tf.gather(self.facts, step), mem_state_double))])
 			# record Z (all episodic memory states)
 			print("!")
 			episodic_array.append(
 				feedforward_nn(z, self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size))
 			step =tf.add(step, 1)
-			return step, story_len, facts, q_double, mem_state_double
+			return step, story_len, q_double, mem_state_double
 
 		for hops in xrange(self.memory_hops):
 			# gate attention network
 			step = tf.constant(0)
-			tf.while_loop(lambda step, story_len, facts, q_double, mem_state_double: tf.less(step, story_len),
-				lambda step, story_len, facts, q_double, mem_state_double: mem_body(step, story_len, facts, q_double, mem_state_double),
-				[step, self.story_len, self.facts, q_double, mem_state_double])	
+			tf.while_loop(lambda step, story_len, q_double, mem_state_double: tf.less(step, story_len),
+				lambda step, story_len, q_double, mem_state_double: mem_body(step, story_len, q_double, mem_state_double),
+				[step, self.story_len, q_double, mem_state_double])	
 
 			#self.episodic_gate = tf.reshape(tf.nn.softmax(self.episodic_array),[1])
 			self.episodic_gate = tf.nn.softmax(tf.reshape(tf.concat(0,self.episodic_array), [1,-1]))
@@ -286,7 +288,7 @@ class DMN(object):
 		input_feed = {}
 		for l in range(len(story)):
 			input_feed[self.story[l].name] = [story[l]]
-		for l in range(len(story),100):
+		for l in range(len(story), self.maximum_story_length):
 			input_feed[self.story[l].name] = [0]
 		# input_feed[self.story_len_.name]= len(story_mask)
 		for l in range(len(question)):
@@ -299,16 +301,28 @@ class DMN(object):
 		input_feed[self.story_len.name] = len(story_mask)
 
 		if not forward_only:
-			output_feed = [self.logits,
-							self.updates,	# Update Op that does SGD.
+			output_feed = [self.updates,	# Update Op that does SGD.
 							self.gradient_norms,	# Gradient norm.
-							self.loss]	# Loss for this batch.
+							self.loss,	# Loss for this batch.
+							# debugging
+							self.story_vec[0],	
+							self.logits,
+							self.question_state,
+							self.facts,
+							self.episodic_gate]
 		else:
 			output_feed = [self.loss,		# Loss for this batch.
-							tf.argmax(self.logits, 0)]
+							tf.argmax(self.logits, 0),
+							# debugging
+							self.logits,
+							self.question_state,
+							self.facts,
+							self.episodic_gate]
 
 		outputs = session.run(output_feed, input_feed)
 		if not forward_only:
+			# testing
+			print (len(self.story_vec), "+=++++++++++++")
 			return outputs#[1], outputs[2], None  # Gradient norm, loss, no outputs.
 		else:
 			return None, outputs[0], outputs[1]  # No gradient norm, loss, outputs.

@@ -2,7 +2,7 @@ import os as os
 import numpy as np
 
 def init_babi(fname):
-    print "==> Loading test from %s" % fname
+    print "[*] Loading test from %s" % fname
     tasks = []
     task = None
     for i, line in enumerate(open(fname)):
@@ -24,6 +24,25 @@ def init_babi(fname):
 
     return tasks
 
+def load_glove_w2v(fname):
+    print ("[*] Loading word2vec from %s" % fname)
+    vocab = {}
+    ivocab = {}
+    embedding = []
+    # add [PAD] and [UNK]
+    vocab['PAD'] = 0
+    ivocab[0] = 'PAD'
+    embedding.append([0.0 for i in range(300)])
+    vocab['UNK'] = 1
+    ivocab[1] = 'UNK'
+    embedding.append([1.0 for i in range(300)])
+    for i, line in enumerate(open(fname)):
+        line = line.split()
+        vocab[line[0]] = i+2    # 2 is the offset of PAD and UNK
+        ivocab[i+2] = line[0]
+        embedding.append(map(float, line[1:]))
+    embedding_size = len(embedding[0])
+    return vocab, ivocab, embedding, embedding_size
 
 def get_babi_raw(id, test_id=""):
     babi_map = {
@@ -80,15 +99,14 @@ def get_babi_raw(id, test_id=""):
     return babi_train_raw, babi_test_raw
 
 
-def process_word(word, vocab, ivocab, silent=False):
+def process_word(word, vocab):
     if not word in vocab: 
-        next_index = len(vocab)
-        vocab[word] = next_index
-        ivocab[next_index] = word
+        print ('%s is not in the dict' %word)
+        return vocab['UNK']
     return vocab[word]
 
 
-def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence'):
+def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence', maximum_len=15):
     questions = []
     inputs = []
     answers = []
@@ -114,12 +132,10 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
         q = [w for w in q if len(w) > 0]
         
         inp_vector = [process_word(word = w, 
-                                vocab = vocab, 
-                                ivocab = ivocab) for w in inp]
+                                vocab = vocab) for w in inp]
 
         q_vector = [process_word(word = w, 
-                                vocab = vocab, 
-                                ivocab = ivocab) for w in q]
+                                vocab = vocab) for w in q]
 
         if (input_mask_mode == 'word'):
             input_mask = range(len(inp))
@@ -132,17 +148,21 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
         questions.append(q_vector)
         # NOTE: here we assume the answer is one word! 
         answers.append(process_word(word = x["A"], 
-                                        vocab = vocab, 
-                                        ivocab = ivocab))
+                                        vocab = vocab))
         fact_counts.append(fact_count)
         input_masks.append(input_mask)
     
-    return inputs, questions, answers, fact_counts, input_masks, vocab, ivocab 
+    return inputs, questions, answers, fact_counts, input_masks 
 
 
 
 # babi_train_raw, babi_validation_raw = get_babi_raw("1")
-# t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = process_input(babi_train_raw)
+# vocab, ivocab, embedding, embedding_size = load_glove_w2v('./glove.6B.300d.txt')
+# t_context, t_questions, t_answers, t_fact_counts, t_input_masks = process_input(babi_train_raw, vocab, ivocab)
+
+# print (len(vocab))
+# print (t_context)
+
 
 
 

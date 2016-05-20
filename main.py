@@ -31,7 +31,7 @@ flags.DEFINE_integer("episodic_m_depth", 1, "memory update module depth")
 flags.DEFINE_integer("ep_depth", 1, "episodic module depth")
 flags.DEFINE_integer("m_input_size", 1200, "[m; c; q] concatenate in episodic module")
 flags.DEFINE_integer("attention_ff_l1_size", 100, "episodic gating neural network first layer size")
-flags.DEFINE_integer("maximum_story_length", 100, "max story length")
+flags.DEFINE_integer("maximum_story_length", 200, "max story length")
 flags.DEFINE_integer("maximum_attention_length", 15, "max attetion length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 10, "max memoy hops")
@@ -43,6 +43,7 @@ flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 # flags.DEFINE_integer("batch_size", 32, "Batch size to use during training.")
 # flags.DEFINE_integer("max_len", 100, "sequence length longer than this will be ignored.")
 # flags.DEFINE_integer("depth", 1, "Number of layers in the model.")
+flags.DEFINE_string("word2vec_dir", "./glove.6B.300d.txt", "word2vec location")
 flags.DEFINE_string("data_dir", "bAbI_data/en", "Data directory")
 flags.DEFINE_string("train_dir", "bAbI_data/en", "Training directory.")
 flags.DEFINE_boolean("use_lstm", False, "Set True using LSTM, or False using GRU")
@@ -56,9 +57,9 @@ FLAGS = flags.FLAGS
 
 
 
-def create_model(session, forward_only):
+def create_model(session, vocab_size, forward_only):
 
-	model = DMN(FLAGS.vocab_size, 
+	model = DMN(vocab_size, 
 		FLAGS.embedding_size, 
 		FLAGS.learning_rate, 
 		FLAGS.learning_rate_decay_op, 
@@ -89,24 +90,34 @@ def train():
 	if FLAGS.data_type == "1":
 		print("[*] Preparing bAbI data ... in %s" % FLAGS.data_dir)
 		babi_train_raw, babi_validation_raw = data_utils.get_babi_raw("1")
-		t_context, t_questions, t_answers, t_fact_counts, t_input_masks, vocab, ivocab = data_utils.process_input(babi_train_raw)
-		v_context, v_questions, v_answers, v_fact_counts, v_input_masks, vocab, ivocab = data_utils.process_input(babi_validation_raw, vocab, ivocab)
+		vocab, ivocab, embedding, embedding_size = data_utils.load_glove_w2v(FLAGS.word2vec_dir)
+		if embedding_size != FLAGS.embedding_size:
+			raise Exception ("Embedding size of model and word2vec must match.")
+		t_context, t_questions, t_answers, t_fact_counts, t_input_masks = data_utils.process_input(babi_train_raw, vocab, ivocab)
+		v_context, v_questions, v_answers, v_fact_counts, v_input_masks = data_utils.process_input(babi_validation_raw, vocab, ivocab)
 	else:
 		raise Exception ("Only joint mode is allowed")
 	with tf.Graph().as_default():
 		with tf.Session() as sess:
-			model = create_model(sess, False)
+			model = create_model(sess, len(vocab), False)
+			sess.run(embedding_init, feed_dict={embedding_placeholder: embedding})
 			step_time, loss = 0.0, 0.0
 			current_step = 0
 			previous_losses = []
 			for j in range(50):
+				print ("step %i" % j)
 				for i in range(999):
 					# _, loss, _ = 
 					loss = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
-					print (loss)	
-					print (len(loss[0][0]))
 					# writer = tf.train.SummaryWriter("./tensorboard", sess.graph_def)
-
+					print ("===================")
+					print (loss[1].shape)
+					print (loss[2].shape)
+					print (loss[3].shape)
+					print (loss[4].shape)
+					print (loss[5].shape)
+					print (loss[6].shape)
+					print (loss[7].shape)
 
 def test():
 	"""Test the DMN model."""
