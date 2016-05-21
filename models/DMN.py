@@ -35,7 +35,7 @@ class DMN(object):
 	def __init__(self, vocab_size, embedding_size, learning_rate, 
 		learning_rate_decay_op, memory_hops, dropout_rate, 
 		q_depth, a_depth, episodic_m_depth, ep_depth,
-		m_input_size, attention_ff_l1_size, max_gradient_norm, maximum_story_length=100,
+		m_input_size, attention_ff_l1_size, max_gradient_norm, maximum_story_length=20,
 		maximum_question_length=20, use_lstm=False, forward_only=False):
 	
 		# initialization
@@ -77,6 +77,9 @@ class DMN(object):
 		for i in range(self.maximum_story_length):
 			self.story.append(tf.placeholder(tf.int32, shape=[None], 
 												name="story{0}".format(i)))
+		self.story_embedding = []
+		for i in range(self.maximum_story_length)
+		self.story_embedding.append(tf.nn.embedding_lookup(W, self.story[i]))
 		self.story_mask = tf.placeholder(tf.int32, shape=[None], name="story_mask")
 		self.story_len = tf.placeholder(tf.int32, shape=[], name="slength")
 		print (self.story_len)
@@ -111,8 +114,8 @@ class DMN(object):
 		# Initializing embedding cell
 		with variable_scope.variable_scope("embedding_rnn"):
 			encoder_cell = rnn_cell.EmbeddingWrapper(
-					embedding_cell, embedding_classes=vocab_size,
-					embedding_size=embedding_size)
+				embedding_cell, embedding_classes=vocab_size,
+				embedding_size=embedding_size)
 
 
 
@@ -122,13 +125,6 @@ class DMN(object):
 
 
 		#------------ Input module ------------
-		# reader_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		# if use_lstm:
-		# 	reader_cell = tf.nn.rnn_cell.BasicLSTMCell(self.embedding_size)
-		# if not forward_only and dropout_rate < 1:
-		# 	reader_cell = tf.nn.rnn_cell.DropoutWrapper(
-		# 		reader_cell, output_keep_prob=dropout_rate)
-		# Embedded toekn into vector, feed into rnn cell return cell state
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		if use_lstm:
@@ -226,7 +222,7 @@ class DMN(object):
 			step = tf.constant(0)
 			tf.while_loop(lambda step, story_len, q_double, mem_state_double: tf.less(step, story_len),
 				lambda step, story_len, q_double, mem_state_double: mem_body(step, story_len, q_double, mem_state_double),
-				[step, self.story_len, q_double, mem_state_double])	
+				[step, self.story_len, q_double, mem_state_double])
 
 			#self.episodic_gate = tf.reshape(tf.nn.softmax(self.episodic_array),[1])
 			self.episodic_gate = tf.nn.softmax(tf.reshape(tf.concat(0,self.episodic_array), [1,-1]))

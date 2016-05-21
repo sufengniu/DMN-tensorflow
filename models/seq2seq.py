@@ -29,10 +29,6 @@ def sentence_embedding_rnn(_encoder_inputs, vocab_size, cell,
 	
 	"""
 	with variable_scope.variable_scope("embedding_rnn", reuse=reuse_scop):
-		encoder_cell = rnn_cell.EmbeddingWrapper(
-				cell, embedding_classes=vocab_size,
-				embedding_size=embedding_size)
-		# Divde encoder_inputs by given input_mask
 		if mask != None:
 			encoder_inputs = [[] for _ in mask]
 			_mask = 0
@@ -46,10 +42,10 @@ def sentence_embedding_rnn(_encoder_inputs, vocab_size, cell,
 		encoder_state = None	 
 		encoder_states = []
 		for encoder_input in encoder_inputs:
-			if encoder_state == None:
-				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, dtype=dtype)
+			if encoder_state == []:
+				_, encoder_state = rnn.dynamic_rnn(cell, encoder_input, dtype=dtype)
 			else:
-				_, encoder_state = rnn.rnn(encoder_cell, encoder_input, encoder_state, dtype=dtype)
+				_, encoder_state = rnn.dynamic_rnn(cell, encoder_input, encoder_state, dtype=dtype)
 			encoder_states.append(encoder_state)
 		return encoder_states
 
