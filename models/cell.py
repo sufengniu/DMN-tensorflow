@@ -75,13 +75,11 @@ class MemCell(rnn_cell.RNNCell):
 	def state_size(self):
 		return self._num_units
 
-	def __call__(self, inputs, question, state, m_input_size, m_size, scope=None):
+	def __call__(self, inputs, question, state, mem_weights, m_input_size, m_size, mem_hops, scope=None):
 		""" simple Recurrent cell for memory updates """
 
-		with tf.variable_scope("episodic"):
-			mem_weights = tf.get_variable("mem_weights", [m_input_size, self._num_units])
-			mem_bias = tf.get_variable("mem_biases", [self._num_units])
-		new_state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights) + mem_bias)
+		for hops in xrange(mem_hops):
+			new_state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
 		return new_state
 
 
