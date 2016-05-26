@@ -77,10 +77,10 @@ class MemCell(rnn_cell.RNNCell):
 
 	def __call__(self, inputs, question, state, mem_weights, m_input_size, m_size, mem_hops, scope=None):
 		""" simple Recurrent cell for memory updates """
-
-		for hops in xrange(mem_hops):
-			new_state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
-		return new_state
+			
+		for hops in xrange(1, mem_hops):
+			state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
+		return state
 
 
 class MultiMemCell(rnn_cell.RNNCell):
@@ -206,10 +206,10 @@ def rnn_ep(cell, inputs, episodic_gate, initial_state=None, dtype=None,
 			min_sequence_length = math_ops.reduce_min(sequence_length)
 			max_sequence_length = math_ops.reduce_max(sequence_length)
 
-		for time, input_ in enumerate(inputs):
+		for time, (input_, episodic_gate_) in enumerate(zip(inputs, episodic_gate)):
 			if time > 0: vs.get_variable_scope().reuse_variables()
 			# pylint: disable=cell-var-from-loop
-			call_cell = lambda: cell(input_, state, episodic_gate)
+			call_cell = lambda: cell(input_, state, episodic_gate_)
 			# pylint: enable=cell-var-from-loop
 			if sequence_length is not None:
 				(output, state) = rnn._rnn_step(

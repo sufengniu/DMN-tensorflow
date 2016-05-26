@@ -77,7 +77,7 @@ class DMN(object):
 			story_embedded.append(tf.nn.embedding_lookup(W, self.story[i]))
 			story_embedded[i] = tf.transpose(story_embedded[i],[1,0,2])
 
-		self.story_len = tf.placeholder(tf.int32, shape=[None], name="Story_length")
+		self.story_len = tf.placeholder(tf.int64, shape=[1], name="Story_length")
 
 		self.question = tf.placeholder(tf.int32, shape=[None,None], name="Question")
 		question_embedded = tf.transpose(tf.nn.embedding_lookup(W, self.question), [1,0,2])
@@ -89,12 +89,10 @@ class DMN(object):
 		softmax_weights = tf.Variable(tf.truncated_normal([self.a_size, self.vocab_size], -0.1, 0.1), name="softmax_weights")
 		softmax_biases = tf.Variable(tf.zeros([self.vocab_size]), name="softmax_biases")
 		
-		answer_weights = tf.Variable(tf.truncated_normal([self.m_size, self.a_size], -0.1, 0.1), name="answer_weights")
-		# answer_biases = tf.Variable(tf.zeros([self.a_size]), name="answer_biases")
+		answer_weights = tf.Variable(tf.truncated_normal([self.m_size, self.a_size], -0.1, 0.1), name="answer_weights")	
 
 		#------------ question module ------------
 		embedding_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-
 		with tf.variable_scope("embedding_rnn"):
 			_, self.question_state = rnn.dynamic_rnn(embedding_cell, question_embedded, dtype=tf.float32, time_major=True)
 
@@ -107,43 +105,27 @@ class DMN(object):
 
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
 		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		(self.facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell, self.story_state_array, dtype=tf.float32)
-
-
-		#------------ episodic memory module ------------
-		# TODO: use self.facts to extract ep_size
+		(self.facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell, self.story_state_array, dtype=tf.float32)	
+		
+		#------------ episodic memory module ------------	
 		self.ep_size = 2*self.embedding_size# episodic cell size
-		# construct memory cell
-		#single_cell = tf.nn.rnn_cell.BasicLSTMCell(self.m_size)
+		# construct memory cell	
 		mem_cell = cell.MemCell(self.m_size)
 		#mem_cell = tf.nn.rnn_cell.GRUCell(self.m_size)
 		self.episodic_array = tf.Variable(tf.random_normal([1,1]))
 
-		# construct episodic_cell
-
-		# for i in xrange(self.memory_hops):
+		# construct episodic_cell	
 		single_cell = cell.MGRUCell(self.ep_size)
 		ep_cell = cell.MultiMGRUCell([single_cell] * ep_depth)
 
-		e = []
-		mem_state = self.question_state
 		q_double = tf.concat(1, [self.question_state, self.question_state])
-		mem_state_double = tf.concat(1, [mem_state, mem_state])
+		mem_state_double = q_double
 
 		# TODO change z_dim to be 
 		z_dim = self.embedding_size * 8
 		attention_ff_size = z_dim
 		attention_ff_l2_size = 1 
-		# self._ep_initial_state = []
-		# for _cell in range(ep_cell)
-		# 	self._ep_initial_state.append = _cell.zero_state(1, tf.float32)	# TODO change batch size
-
-		# initialize parameters		
-		# parameters of attention gate
-		# l1_weights = tf.Variable(tf.truncated_normal([self.attention_ff_size, self.attention_ff_l1_size], -0.1, 0.1), name="l1_weights")
-		# l1_biases = tf.Variable(tf.zeros([self.attention_ff_l1_size]), name="l1_biases")
-		# l2_weights = tf.Variable(tf.truncated_normal([self.attention_ff_l1_size, self.attention_ff_l2_size], -0.1, 0.1), name="l2_weights")
-		# l2_biases = tf.Variable(tf.zeros([self.attention_ff_l2_size]), name="l2_biases")
+	
 		with tf.variable_scope("feedforward_nn"):
 			l1_weights = tf.get_variable("l1_weights", [attention_ff_size, attention_ff_l1_size], 
 				initializer=tf.random_normal_initializer())
@@ -159,23 +141,6 @@ class DMN(object):
 				gate_prediction = tf.matmul(l2_input , l2_weights) + l2_biases	
 				return gate_prediction
 
-
-		# initializing variable of feedforward nn
-		# seq2seq.def_feedforward_nn(self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size)
-		
-		# def mem_body(step, story_len, q_double, mem_state_double):
-		# 	print ("-------------")
-		# 	print (self.facts[step])
-		# 	print ("+++++++++++++")
-		# 	z = tf.concat(1, [tf.mul(self.facts[step], q_double), tf.mul(self.facts[step], mem_state_double), 
-		# 		tf.abs(tf.sub(self.facts[step], q_double)), tf.abs(tf.sub(self.facts[step], mem_state_double))])
-		# 	# record Z (all episodic memory states)
-		# 	print("!")
-		# 	episodic_array.append(
-		# 		feedforward_nn(z, self.attention_ff_size, self.attention_ff_l1_size, self.attention_ff_l2_size))
-		# 	step =tf.add(step, 1)
-		# 	return step, story_len, q_double, mem_state_double
-
 		# -------- multi-layer feedforward for multi-hop propagation -----------
 		mem_weights = dict()	
 		for hops in xrange(self.memory_hops):
@@ -183,41 +148,53 @@ class DMN(object):
 			mem_weights[hops]["weights"] = tf.Variable(tf.truncated_normal([self.m_input_size, self.m_size], -0.1, 0.1))
 			mem_weights[hops]["biases"] = tf.Variable(tf.zeros([self.m_size]))
 
-		mem_array = []
-		for hops in xrange(self.memory_hops):
-			# gate attention network
+
+		episodic_array = []
+		hops = tf.Variable(0, trainable=False)
+		for step in range(maximum_story_length):
+			z = tf.concat(1, [tf.mul(self.facts[step], q_double), tf.mul(self.facts[step], mem_state_double), 
+			tf.abs(tf.sub(self.facts[step], q_double)), tf.abs(tf.sub(self.facts[step], mem_state_double))])
+			episodic_array.append(feedforward_nn(step, z))
+
+		self.episodic_array_reshaped = tf.reshape(tf.concat(0,episodic_array), [1,-1])
+		self.episodic_gate = tf.nn.softmax(self.episodic_array_reshaped)
+		self.episodic_gate_unpacked = tf.unpack( tf.reshape(self.episodic_gate, [20,1]))
+		# attention GRU	
+		with tf.variable_scope("episodic", reuse=None):
+			output, context = cell.rnn_ep(ep_cell, self.facts, self.episodic_gate_unpacked, dtype=tf.float32)
+			# memory updates
+			mem_state_current = mem_cell(context, self.question_state, self.question_state, mem_weights, self.m_input_size, self.m_size, 1)
+			mem_state_previous = mem_state_current
+		self.argmax_ep_gate = tf.argmax(self.episodic_gate, 1)
+		
+
+		def body(argmax_ep_gate, hops, mem_state_previous, mem_state_current):
 			episodic_array = []
+			mem_state_double = tf.concat(1, [mem_state_previous, mem_state_previous])
 			for step in range(maximum_story_length):
 				z = tf.concat(1, [tf.mul(self.facts[step], q_double), tf.mul(self.facts[step], mem_state_double), 
 				tf.abs(tf.sub(self.facts[step], q_double)), tf.abs(tf.sub(self.facts[step], mem_state_double))])
 				episodic_array.append(feedforward_nn(step, z))
-				# print (episodic_array)
-				# tf.while_loop(lambda step, story_len, q_double, mem_state_double: tf.less(step, story_len),
-				# 	lambda step, story_len, q_double, mem_state_double: mem_body(step, story_len, q_double, mem_state_double),
-				# 	[step, self.story_len, q_double, mem_state_double])
 
-			#self.episodic_gate = tf.reshape(tf.nn.softmax(self.episodic_array),[1])
 			self.episodic_array_reshaped = tf.reshape(tf.concat(0,episodic_array), [1,-1])
 			self.episodic_gate = tf.nn.softmax(self.episodic_array_reshaped)
-			# print ("episodic_gate",self.episodic_gate)
-
+			self.episodic_gate_unpacked = tf.unpack( tf.reshape(self.episodic_gate, [20,1]))
 			# attention GRU
-			# output, context = cell.rnn(ep_cell[hops], [self.facts], self.episodic_gate, scope="epsodic", dtype=tf.float32)
-			with tf.variable_scope("episodic", reuse=True if hops > 0 else None):
-				output, context = cell.rnn_ep(ep_cell, self.facts, self.episodic_gate, dtype=tf.float32)
+			# with tf.variable_scope("episodic", reuse=True if hops > 0 else None):
+			with tf.variable_scope("episodic", reuse=True):
+				output, context = cell.rnn_ep(ep_cell, self.facts, self.episodic_gate_unpacked, dtype=tf.float32)
+				# memory updates	
+				mem_state_previous = mem_state_current
+				mem_state_current = mem_cell(context, self.question_state, mem_state_previous, mem_weights, self.m_input_size, self.m_size, self.memory_hops)
 
-				# memory updates
-				#_, mem_state = mem_cell(context_state, mem_state)	# GRU
-				#_, mem_state = cell.rnn_mem(mem_cell, [context], self.question_state, mem_state, self.m_input_size, self.m_size, dtype=tf.float32)
-				mem_state = mem_cell(context, self.question_state, mem_state, mem_weights, self.m_input_size, self.m_size, self.memory_hops)
+			self.argmax_ep_gate = tf.argmax(self.episodic_gate, 1)
+			hops = tf.add(hops,1)
+			return self.argmax_ep_gate, hops, mem_state_previous, mem_state_current
+		def condition(argmax_ep_gate, hops, mem_state_previous, mem_state_current):	
+			return tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(20)))
 
-			mem_array.append(mem_state)
-
-			# if the attentioned module is last e, it means the episodic pass is over
-			#if np.argmax(np.asarray(e[-1])) == len(e[-1])-1:
-			#TODO: fix exit bugs in mem cell
-			
-			
+		_, _, mem_state, _ = tf.while_loop(condition, body, [self.argmax_ep_gate, hops, mem_state_previous, mem_state_current])
+	
 		#------------ answer ------------
 		# TODO: use decoder sequence to generate answer
 		answer_steps = 1
@@ -225,23 +202,21 @@ class DMN(object):
 		answer_cell = single_cell
 		if a_depth > 1:
 			answer_cell =tf.nn.rnn_cell.MultiRNNCell([single_cell] * a_depth)
-		
+
 		a_state = mem_state
 		for step in range(answer_steps):
 			y = tf.nn.softmax(tf.matmul(a_state, answer_weights))
-			(answer, a_state) = answer_cell(tf.concat(1, [self.question_state, y]), a_state)
-			#(answer, a_state) = answer_cell(tf.concat(1, [question, mem_state]), a_state)
+			(answer, a_state) = answer_cell(tf.concat(1, [self.question_state, y]), a_state)	
 
 		self.logits = tf.nn.softmax(tf.matmul(answer, softmax_weights)+softmax_biases)
 
 		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
 		self.loss = tf.reduce_mean(
 			tf.nn.softmax_cross_entropy_with_logits(self.logits, answer))
-
-		
+	
 		params = tf.trainable_variables()
-		# for e in params:
-		# 	print(e.get_shape(), e.name, e)
+		#for e in params:
+		#	print(e.get_shape(), e.name, e)
 		if not forward_only:
 			self.gradient_norms = []
 			self.updates = []
@@ -254,8 +229,7 @@ class DMN(object):
 				zip(clipped_gradients, params))#, global_step=self.global_step)
 		
 		self.saver = tf.train.Saver(tf.all_variables())
-
-
+	
 	def step(self, session, story, story_mask, question, answer, forward_only):
 		input_feed = {}
 		# split story according to story_mask and pad it to maximum story length
@@ -269,19 +243,16 @@ class DMN(object):
 			story_splited.append([0])
 		for l in range(self.maximum_story_length):
 			input_feed[self.story[l].name] = [story_splited[l]]
-		# input_feed[self.story_len_.name]= len(story_mask)
 
 		input_feed[self.question.name] = [question]
-		# for l in range(len([answer])):
-		input_feed[self.answer.name] = answer
-		# input_feed[self.story_mask.name] = story_mask
+		input_feed[self.answer.name] = answer	
 		input_feed[self.story_len.name] = [len(story_mask)]
 
 		if not forward_only:
-			output_feed = [self.episodic_gate]
-							# self.updates,	# Update Op that does SGD.
-							# self.gradient_norms,	# Gradient norm.
-							# self.loss,	# Loss for this batch.
+			output_feed = [
+							self.updates,	# Update Op that does SGD.
+							self.gradient_norms,	# Gradient norm.
+							self.loss]	# Loss for this batch.
 							# # debugging
 							# self.story_vec[0],	
 							# self.logits,
@@ -298,25 +269,11 @@ class DMN(object):
 							self.episodic_gate]
 
 		outputs = session.run(output_feed, input_feed)
-		if not forward_only:
-			# testing
-			return outputs#[1], outputs[2], None  # Gradient norm, loss, no outputs.
+		if not forward_only:	
+			return outputs[1], outputs[2], None  # Gradient norm, loss, no outputs.
 		else:
 			return None, outputs[0], outputs[1]  # No gradient norm, loss, outputs.
 
-	# def get_qns(self, data_set):
-	# 	"""Provide data set; return question and story"""
-	# def mem_body(self, step, story_len, facts, q_double, mem_state_double):
-	# 	print("=++++++++++++++++")
-	# 	print("step:",step)
-	# 	z = tf.concat(1, [tf.mul(facts[step, :], q_double), tf.mul(facts[step, :], mem_state_double), 
-	# 		tf.abs(tf.sub(facts[step, :], q_double)), tf.abs(tf.sub(facts[step, :], mem_state_double))])
-	# 	# record Z (all episodic memory states)
-	# 	print("-----------------")
-	# 	self.episodic_array.append(feedforward_nn(z, attention_ff_size, attention_ff_l1_size, attention_ff_l2_size))
-		
-	# 	step =tf.add(step, 1)
-	# 	return step
 	def init_embedding(self, sess, embedding):
 		sess.run(self.embedding_init, feed_dict={self.embedding_placeholder.name: embedding})
 
