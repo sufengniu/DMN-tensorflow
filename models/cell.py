@@ -62,7 +62,7 @@ class MGRUCell(rnn_cell.RNNCell):
 			with vs.variable_scope("Candidate"):
 				c = tanh(rnn_cell.linear([inputs, r * state], self._num_units, True))
 			
-			new_h = episodic_gate * c + (1 - episodic_gate) * state
+			new_h = tf.mul(episodic_gate, c) + tf.mul((1 - episodic_gate), state)
 		return new_h, new_h
 
 class MemCell(rnn_cell.RNNCell):
@@ -75,12 +75,16 @@ class MemCell(rnn_cell.RNNCell):
 	def state_size(self):
 		return self._num_units
 
-	def __call__(self, inputs, question, state, mem_weights, m_input_size, m_size, mem_hops, scope=None):
+	def __call__(self, inputs, question, state, hops, mem_weights, m_input_size, m_size, initial_state, scope=None):
 		""" simple Recurrent cell for memory updates """
-			
-		for hops in xrange(1, mem_hops):
-			state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
-		return state
+		
+		if hops is 0:
+			_state = initial_state
+		else:
+			_state = state
+
+		_state = tf.nn.relu(tf.matmul(tf.concat(1, [_state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
+		return _state
 
 
 class MultiMemCell(rnn_cell.RNNCell):

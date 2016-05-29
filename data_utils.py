@@ -32,10 +32,10 @@ def load_glove_w2v(fname):
     # add [PAD] and [UNK]
     vocab['PAD'] = 0
     ivocab[0] = 'PAD'
-    embedding.append([0.0 for i in range(300)])
+    embedding.append([0.0 for i in range(50)])
     vocab['UNK'] = 1
     ivocab[1] = 'UNK'
-    embedding.append([1.0 for i in range(300)])
+    embedding.append([1.0 for i in range(50)])
     for i, line in enumerate(open(fname)):
         line = line.split()
         vocab[line[0]] = i+2    # 2 is the offset of PAD and UNK
@@ -126,8 +126,8 @@ def process_input(data_raw, _vocab=None, _ivocab=None, input_mask_mode='sentence
         inp = x["C"].lower().split(' ')
         inp = [w for w in inp if len(w) > 0]
         # Add end of pass at the end of each story
-        inp.append('*')
-        inp.append('.')
+        # inp.append('*')
+        # inp.append('.')
         q = x["Q"].lower().split(' ')
         q = [w for w in q if len(w) > 0]
         
