@@ -43,6 +43,7 @@ class MGRUCell(rnn_cell.RNNCell):
 	def __init__(self, num_units):
 		self._num_units = num_units
 
+
 	@property
 	def state_size(self):
 		return self._num_units
@@ -75,16 +76,12 @@ class MemCell(rnn_cell.RNNCell):
 	def state_size(self):
 		return self._num_units
 
-	def __call__(self, inputs, question, state, hops, mem_weights, m_input_size, m_size, initial_state, scope=None):
+	def __call__(self, inputs, question, state, mem_weights, mem_biases, hops, scope=None):
 		""" simple Recurrent cell for memory updates """
-		
-		if hops is 0:
-			_state = initial_state
-		else:
-			_state = state
+		'''IndexedSlices' object has no attribute get_shape'''
 
-		_state = tf.nn.relu(tf.matmul(tf.concat(1, [_state, inputs, question]), mem_weights[hops]["weights"]) + mem_weights[hops]["biases"])
-		return _state
+		state = tf.nn.relu(tf.matmul(tf.concat(1, [state, inputs, question]), mem_weights) + mem_biases)
+		return state
 
 
 class MultiMemCell(rnn_cell.RNNCell):

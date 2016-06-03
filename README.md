@@ -1,3 +1,5 @@
 # DMN-tensorflow
 
-this is Dynamic Memory Network implementation and its improvement by using unsupervised learning
+first run ./get_bAbI.sh to get the bAbI data and glove pre-trained word vectors
+then run python main.py to run the code
+
