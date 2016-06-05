@@ -157,10 +157,11 @@ class DMN(object):
 
 		self.a_state = mem_state
 				
-		self.predicted_answer = tf.nn.softmax(tf.matmul(self.a_state, answer_weights))
+		self.predicted_answer = tf.matmul(self.a_state, answer_weights)
 		
 		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
-		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer))
+		# self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer))
+		self.loss = tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer)
 		params = tf.trainable_variables()	
 
 		if not forward_only:
