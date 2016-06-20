@@ -99,22 +99,21 @@ class DMN(object):
 					_, story_states = tf.nn.dynamic_rnn(Story_embedding_cell, story_embedded[i], dtype=tf.float32, time_major=True)
 					self.story_state_array.append(story_states)
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		(self.facts, _, _) = rnn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell, self.story_state_array, dtype=tf.float32)		
+		#fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
+		#(self.facts_, _, _) = tf.nn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell, self.story_state_array, dtype=tf.float32)		
+		(self.facts_, _) = tf.nn.rnn(fusion_fw_cell, self.story_state_array, sequence_length=self.story_len, dtype=tf.float32, scope='story_rnn')
+
+		#------------ episodic memory module ------------
 		
-		#------------ episodic memory module ------------	
-		self.ep_size = self.embedding_size * 4 # episodic cell size
-		
-		z_dim = self.embedding_size * 8
+		z_dim = self.embedding_size * 4
 		attention_ff_size = z_dim
-		attention_ff_l2_size = 1 
-		q_double = tf.concat(1, [self.question_state, self.question_state])
+		attention_ff_l2_size = 1 	
 
 		# -------- multi-layer feedforward for multi-hop propagation -----------	
 		self.facts = tf.concat(0, self.facts_)
 		# ep_cell = cell.MGRUCell(self.ep_size)
 		# mem_cell = cell.MemCell(self.m_size)	
-		mem_weights = tf.get_variable("mem_weights", [attention_ff_size, self.m_size], initializer=tf.random_normal_initializer())
+		mem_weights = tf.get_variable("mem_weights", [embedding_size * 3, self.m_size], initializer=tf.random_normal_initializer(0.0, 0.5))
 		mem_biases = tf.get_variable("mem_biases", [self.m_size], initializer=tf.random_normal_initializer())
 		l1_weights = tf.get_variable("l1_weights", [attention_ff_size, attention_ff_l1_size], 
 			initializer=tf.random_normal_initializer())
@@ -144,8 +143,19 @@ class DMN(object):
 				state = tf.mul(episodic_gate_, c) + tf.mul((1 - episodic_gate_), state)
 			return state
 		episodic_gate_unpacked = []
+		def condition(mem_state_previous, hops):	
+			z = tf.concat(1, [tf.mul(self.facts, self.question_state), tf.mul(self.facts, mem_state_previous), 
+				tf.abs(tf.sub(self.facts, self.question_state)), tf.abs(tf.sub(self.facts, mem_state_previous))], name="z")
+			episodic_array_reshaped = tf.reshape(tf.matmul(tf.tanh(tf.matmul(z , l1_weights) + l1_biases) , l2_weights)
+			 + l2_biases, [1,-1], name="episodic_array_reshaped")
+			episodic_gate = tf.nn.softmax(episodic_array_reshaped)
+			episodic_gate_unpacked = tf.unpack( tf.reshape(episodic_gate, [maximum_story_length,1]))
+			argmax_ep_gate = tf.to_int32(tf.argmax(episodic_gate, 1)) #should be 1
+			return tf.cond(tf.equal(hops,0),lambda: tf.constant(True),
+				lambda: tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops))))
+			# return tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops)))
 		def body(mem_state_previous, hops):
-					
+
 			# attention GRU	
 			# outputs, context = cell.rnn_ep(ep_cell, self.facts_, episodic_gate_unpacked, dtype=tf.float32)
 			# outputs, context = ep_cell(ep_cell, self.facts_, episodic_gate_unpacked)
@@ -160,38 +170,29 @@ class DMN(object):
 			hops = tf.add(hops,1)
 			return  mem_state_current, hops
 
-		def condition(mem_state_previous, hops):
-			mem_state_double = tf.concat(1, [mem_state_previous, mem_state_previous])
-			z = tf.concat(1, [tf.mul(self.facts, q_double), tf.mul(self.facts, mem_state_double), 
-				tf.abs(tf.sub(self.facts, q_double)), tf.abs(tf.sub(self.facts, mem_state_double))], name="z")
-			episodic_array_reshaped = tf.reshape(tf.matmul(tf.tanh(tf.matmul(z , l1_weights) + l1_biases) , l2_weights) + l2_biases, [1,-1], name="episodic_array_reshaped")
-			episodic_gate = tf.nn.softmax(episodic_array_reshaped)
-			episodic_gate_unpacked = tf.unpack( tf.reshape(episodic_gate, [maximum_story_length,1]))
-			argmax_ep_gate = tf.to_int32(tf.argmax(episodic_gate, 1)) #should be 1
-			return tf.cond(tf.equal(hops,0),lambda: tf.equal(hops,0),
-				lambda: tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops))))
-			# return tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops)))
+
 
 		initial_argmax_ep_gate = tf.constant(0)
 		initial_hops = tf.constant(0)
 			# initial_context = tf.constant([[0.5 for _ in range(50)]])
-		mem_state, _ = tf.while_loop(condition,body,[self.question_state, initial_hops], back_prop=True)
+		mem_state, self.hops = tf.while_loop(condition,body,[self.question_state, initial_hops], back_prop=True)
 
 
 		self.a_state = mem_state
 				
 		self.predicted_answer = tf.matmul(self.a_state, answer_weights)
-		
+		self.softmax_answer = tf.nn.softmax(self.predicted_answer)
+		self.argmax_answer = tf.argmax(self.softmax_answer, 1)
 		answer = tf.reshape(tf.one_hot(self.answer, self.vocab_size, 1.0, 0.0), [1,self.vocab_size])
-		self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer))
+		self.loss = tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer)
 		# self.loss = tf.nn.softmax_cross_entropy_with_logits(self.predicted_answer, answer)
 		params = tf.trainable_variables()	
 
 		if not forward_only:
 			self.gradient_norms = []
 			self.updates = []
-			# optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
-			optimizer = tf.train.AdamOptimizer(self.learning_rate)
+			optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+			# optimizer = tf.train.AdamOptimizer(self.learning_rate)
 			gradients = tf.gradients(self.loss, params)
 	
 			clipped_gradients, norm = tf.clip_by_global_norm(gradients,
@@ -212,17 +213,23 @@ class DMN(object):
 			if i == story_mask[story_count]:
 				story_count += 1
 		for i in range(len(story_mask),self.maximum_story_length):
-			story_splited.append([0,0,0,0,0])
+			story_splited.append([0])
+		
 		for l in range(self.maximum_story_length):
 			input_feed[self.story[l].name] = [story_splited[l]]
 
 		input_feed[self.question.name] = [question]
 		input_feed[self.answer.name] = answer	
-		print ('correct answer: ',answer)
 		input_feed[self.story_len.name] = [len(story_mask)]
 		
 		if not forward_only:
-			output_feed = [self.gradient_norms, self.loss, self.updates]
+			output_feed = [self.loss,
+							self.gradient_norms, 
+							self.updates]#,
+							#self.argmax_answer,
+							#self.predicted_answer,
+							#self.a_state,
+							#self.hops]
 		else:
 			output_feed = [self.loss,		# Loss for this batch.
 							tf.argmax(self.logits, 0),
