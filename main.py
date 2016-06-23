@@ -35,9 +35,9 @@ flags.DEFINE_integer("maximum_attention_length", 15, "max attetion length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 5, "max memoy hops")  # testing should be 10
 flags.DEFINE_integer("epoch", 5, "number of repeating training")
-flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
+flags.DEFINE_float("learning_rate", 0.1, "Learning rate.")
 flags.DEFINE_float("learning_rate_decay_op", 0.99, "Learning rate decay.")
-flags.DEFINE_float("dropout_rate", 0.5, "dropout rates")
+flags.DEFINE_float("dropout_rate", 0.4, "dropout rates")
 flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 flags.DEFINE_integer("batch_size", 8, "Batch size to use during training.")
 # flags.DEFINE_integer("max_len", 100, "sequence length longer than this will be ignored.")
@@ -49,6 +49,7 @@ flags.DEFINE_boolean("use_lstm", False, "Set True using LSTM, or False using GRU
 # flags.DEFINE_integer("max_train_data_size", 0, "Limit on the size of training data (0: no limit).")
 flags.DEFINE_integer("steps_per_checkpoint", 200, "How many training steps to do per checkpoint.")
 # flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
+flags.DEFINE_boolean("validation", False, "Set to True for test set validation.")
 flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
 flags.DEFINE_string("data_type", "1", "choose babi_map, check data_utils for detail")
 
@@ -100,12 +101,12 @@ def train():
       step_time, loss = 0.0, 0.0
       current_step = 0
       previous_losses = []
-      for j in range(5):
+      for j in range(20):
         print ("step %i" % j)
         for i in range(len(t_context)):
           start_time = time.time()
-          step_loss, _, _ = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
-          print (step_loss)
+          step_loss, _, _, answer = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
+          print (step_loss, ivocab[int(answer)])
           print ('correct answer:%s' % ivocab[int(t_answers[i])])
           step_time += (time.time() - start_time) / FLAGS.steps_per_checkpoint
           loss += step_loss / FLAGS.steps_per_checkpoint
@@ -123,7 +124,7 @@ def train():
             previous_losses.append(loss)
             # Save checkpoint and zero timer and loss.
             checkpoint_path = os.path.join(FLAGS.train_dir, "DMN.ckpt")
-            # model.saver.save(sess, checkpoint_path, global_step=model.global_step)
+            model.saver.save(sess, checkpoint_path, global_step=model.global_step)
             step_time, loss = 0.0, 0.0
             # Run evals on development set and print their perplexity.
             # for bucket_id in xrange(len(_buckets)):
@@ -150,9 +151,16 @@ def validation():
     # Create model and load parameters.
     model = create_model(sess, len(vocab), True)
     model.init_embedding(sess, embedding)
+    counter = 0
     for i in range(len(v_context)):
       start_time = time.time()
-      step_loss, _, _= model.step(sess, v_context[i], v_input_masks[i], v_questions[i], v_answers[i], True)
+      _, step_loss, answer = model.step(sess, v_context[i], v_input_masks[i], v_questions[i], v_answers[i], True)
+      print (step_loss,answer,v_answers[i])
+      if answer == v_answers[i]:
+        counter += 1
+    print ('counter %i' % counter)
+    accuracy = counter /len(v_context)
+    print ('accuracy = %f' % accuracy)
 
 
 def test():
@@ -170,8 +178,11 @@ def test():
 
 
 def main(_):
-  train()# if FLAGS.train:
-  
+  if FLAGS.validation:
+    validation()
+  else:
+    train()
+
 
 
 
