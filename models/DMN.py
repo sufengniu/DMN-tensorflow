@@ -82,16 +82,16 @@ class DMN(object):
 		self.answer = tf.placeholder(tf.int64, name="answer")
 
 		# configuration of attention gate		
-		answer_weights = tf.nn.dropout(tf.Variable(
-			tf.truncated_normal([self.m_size, self.vocab_size], -0.1, 0.1), name="answer_weights"), dropout_rate)
-		answer_biases = tf.nn.dropout(tf.Variable(
-			tf.zeros([self.vocab_size]), name="answer_biases"), dropout_rate)
+		answer_weights = tf.Variable(
+			tf.truncated_normal([self.m_size, self.vocab_size], -0.1, 0.1), name="answer_weights")
+		answer_biases = tf.Variable(
+			tf.zeros([self.vocab_size]), name="answer_biases")
 
 		#------------ question module ------------
 		with tf.variable_scope("embedding_rnn"):
 			embedding_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-			embedding_cell = tf.nn.rnn_cell.DropoutWrapper(
-				embedding_cell, output_keep_prob=dropout_rate)
+			#embedding_cell = tf.nn.rnn_cell.DropoutWrapper(
+			#	embedding_cell, output_keep_prob=dropout_rate)
 			_, self.question_state = tf.nn.dynamic_rnn(embedding_cell, question_embedded, dtype=tf.float32, time_major=True)
 		
 		#------------ Input module ------------
@@ -105,107 +105,128 @@ class DMN(object):
 				_, story_states = tf.nn.dynamic_rnn(embedding_cell, story_embedded[i], dtype=tf.float32, time_major=True)
 				self.story_state_array.append(story_states)
 		fusion_fw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		fusion_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
-				fusion_fw_cell, output_keep_prob=dropout_rate)
+		#fusion_fw_cell = tf.nn.rnn_cell.DropoutWrapper(
+		#		fusion_fw_cell, output_keep_prob=dropout_rate)
 		fusion_bw_cell = tf.nn.rnn_cell.GRUCell(self.embedding_size)
-		fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
-				fusion_bw_cell, output_keep_prob=dropout_rate)
+		#fusion_bw_cell = tf.nn.rnn_cell.DropoutWrapper(
+		#		fusion_bw_cell, output_keep_prob=dropout_rate)
 		(self.facts_, _, _) = tf.nn.bidirectional_rnn(fusion_fw_cell,fusion_bw_cell, self.story_state_array, dtype=tf.float32)		
 		# (self.facts_, _) = tf.nn.rnn(fusion_fw_cell, self.story_state_array, sequence_length=self.story_len, dtype=tf.float32, scope='story_rnn')
 
 		#------------ episodic memory module ------------
 		
-		z_dim = self.embedding_size * 8
-		attention_ff_size = z_dim
+
+		attention_ff_size = z_dim = self.embedding_size * 8
 		attention_ff_l2_size = 1 	
 		self.question_state_double = tf.concat(1,[self.question_state,self.question_state])
 		# -------- multi-layer feedforward for multi-hop propagation -----------	
 		self.facts = tf.concat(0, self.facts_)
 		# ep_cell = cell.MGRUCell(self.ep_size)
 		# mem_cell = cell.MemCell(self.m_size)	
-		mem_weights = tf.nn.dropout(tf.get_variable("mem_weights", 
-			[embedding_size * 3, self.m_size], 
-			initializer=tf.random_normal_initializer(0.0, 0.5)), dropout_rate)
-		mem_biases = tf.nn.dropout(tf.get_variable("mem_biases", 
-			[self.m_size], initializer=tf.random_normal_initializer()), dropout_rate)
-		l1_weights = tf.nn.dropout(tf.get_variable("l1_weights", 
+		mem_weights = tf.get_variable("mem_weights", 
+			[embedding_size * 4, self.m_size], 
+			initializer=tf.random_normal_initializer(0.0, 0.5))
+		mem_biases = tf.get_variable("mem_biases", 
+			[self.m_size], initializer=tf.random_normal_initializer())
+		l1_weights = tf.get_variable("l1_weights", 
 			[attention_ff_size, attention_ff_l1_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		l1_biases = tf.nn.dropout(tf.get_variable("l1_biases", 
+			initializer=tf.random_normal_initializer())
+		l1_biases = tf.get_variable("l1_biases", 
 			[attention_ff_l1_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		l2_weights = tf.nn.dropout(tf.get_variable("l2_weights", 
+			initializer=tf.random_normal_initializer())
+		l2_weights = tf.get_variable("l2_weights", 
 			[attention_ff_l1_size, attention_ff_l2_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		l2_biases = tf.nn.dropout(tf.get_variable("l2_biases", 
+			initializer=tf.random_normal_initializer())
+		l2_biases = tf.get_variable("l2_biases", 
 			[attention_ff_l2_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
+			initializer=tf.random_normal_initializer())
 		mgru_weights = {}
-		mgru_weights['ur_weights'] = tf.nn.dropout(tf.get_variable('ur_weights', 
-			[embedding_size, embedding_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		mgru_weights['wr_weights'] = tf.nn.dropout(tf.get_variable('wr_weights', 
-			[embedding_size, embedding_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		mgru_weights['uh_weights'] = tf.nn.dropout(tf.get_variable('uh_weights', 
-			[embedding_size, embedding_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		mgru_weights['wh_weights'] = tf.nn.dropout(tf.get_variable('wh_weights', 
-			[embedding_size, embedding_size], 
-			initializer=tf.random_normal_initializer()), dropout_rate)
-		
+		embedding_size_double = embedding_size *2
+		mgru_weights['ur_weights'] = tf.get_variable('ur_weights', 
+			[embedding_size_double, embedding_size_double], 
+			initializer=tf.random_normal_initializer())
+		mgru_weights['wr_weights'] = tf.get_variable('wr_weights', 
+			[embedding_size_double, embedding_size_double], 
+			initializer=tf.random_normal_initializer())
+		mgru_weights['wr_bias'] = tf.get_variable('wr_bias', 
+			[embedding_size_double], 
+			initializer=tf.random_normal_initializer())
+		mgru_weights['uh_weights'] = tf.get_variable('uh_weights', 
+			[embedding_size_double, embedding_size_double], 
+			initializer=tf.random_normal_initializer())
+		mgru_weights['wh_weights'] = tf.get_variable('wh_weights', 
+			[embedding_size_double, embedding_size_double], 
+			initializer=tf.random_normal_initializer())
+		mgru_weights['wh_bias'] = tf.get_variable('wh_bias', 
+			[embedding_size_double], 
+			initializer=tf.random_normal_initializer())
 		def MGRU(inputs, episodic_gates):
 			"""	modified GRU 
 				arg:
 
 			"""
 			batch_size = array_ops.shape(inputs[0])[0]
-			state = tf.zeros([1,embedding_size],tf.float32)
+			state = tf.zeros([1, embedding_size_double],tf.float32)
 			for time, (input_, episodic_gate_) in enumerate(zip(inputs, episodic_gates)):
-				input_ = tf.reshape(input_,[1,embedding_size])
-				r = tf.sigmoid(tf.matmul(input_, mgru_weights['ur_weights']) + tf.matmul(state, mgru_weights['wr_weights']))
-				c = tf.tanh(tf.matmul(input_, mgru_weights['uh_weights']) + tf.matmul(tf.mul(state, r), mgru_weights['wh_weights']))
+				input_ = tf.reshape(input_,[1, embedding_size_double])
+				r = tf.sigmoid(tf.matmul(input_, mgru_weights['ur_weights']) + 
+					tf.matmul(state, mgru_weights['wr_weights']) + mgru_weights['wr_bias'])
+				c = tf.tanh(tf.matmul(input_, mgru_weights['uh_weights']) + 
+					tf.mul(r, tf.matmul(state, mgru_weights['wh_weights'])) + mgru_weights['wh_bias'])
 				state = tf.mul(episodic_gate_, c) + tf.mul((1 - episodic_gate_), state)
 			return state
-		episodic_gate_unpacked = []
-		def condition(mem_state_previous, hops):	
-			mem_state_previous = tf.concat(1, [mem_state_previous, mem_state_previous])
-			z = tf.concat(1, [tf.mul(self.facts, self.question_state_double), tf.mul(self.facts, mem_state_previous), 
-				tf.abs(tf.sub(self.facts, self.question_state_double)), tf.abs(tf.sub(self.facts, mem_state_previous))], name="z")
+		# episodic_gate_unpacked = []
+		# def condition(mem_state_previous, hops):	
+		# 	mem_state_previous = tf.concat(1, [mem_state_previous, mem_state_previous])
+		# 	z = tf.concat(1, [tf.mul(self.facts, self.question_state_double), tf.mul(self.facts, mem_state_previous), 
+		# 		tf.abs(tf.sub(self.facts, self.question_state_double)), tf.abs(tf.sub(self.facts, mem_state_previous))], name="z")
+		# 	episodic_array_reshaped = tf.reshape(tf.matmul(tf.tanh(tf.matmul(z , l1_weights) + l1_biases) , l2_weights)
+		# 	 + l2_biases, [1,-1], name="episodic_array_reshaped")
+		# 	episodic_gate = tf.nn.softmax(episodic_array_reshaped)
+		# 	episodic_gate_unpacked = tf.unpack( tf.reshape(episodic_gate, [maximum_story_length,1]))
+		# 	argmax_ep_gate = tf.to_int32(tf.argmax(episodic_gate, 1)) #should be 1
+		# 	# return tf.cond(tf.equal(hops,0),lambda: tf.constant(True),
+		# 	# 	lambda: tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops))))
+		# 	# return tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops)))
+		# 	return tf.less(hops,tf.constant(self.memory_hops))
+		# def body(mem_state_previous, hops):
+
+		# 	# attention GRU	
+		# 	# outputs, context = cell.rnn_ep(ep_cell, self.facts_, episodic_gate_unpacked, dtype=tf.float32)
+		# 	# outputs, context = ep_cell(ep_cell, self.facts_, episodic_gate_unpacked)
+		# 	context = MGRU(self.facts_, episodic_gate_unpacked)
+
+		# 	# memory updates
+		# 	# mem_state_current = mem_cell(mem_state_previous, self.question_state, mem_state_previous, mem_weights, mem_biases, hops)
+		# 	#question_state_next = question_state_prev
+		# 	#print (self.question_state, mem_state_previous)
+		# 	mem_state_current = tf.nn.relu(tf.matmul(tf.concat(1, [mem_state_previous, context, self.question_state]), mem_weights) + mem_biases)
+			
+		# 	hops = tf.add(hops,1)
+		# 	return  mem_state_current, hops
+		mem_state_array = []
+		gate_array = []
+		mem_state = self.question_state
+		for i in range(self.memory_hops):
+			mem_state_double = tf.concat(1, [mem_state, mem_state])
+			z = tf.concat(1, [tf.mul(self.facts, self.question_state_double), tf.mul(self.facts, mem_state_double), 
+				tf.abs(tf.sub(self.facts, self.question_state_double)), tf.abs(tf.sub(self.facts, mem_state_double))], name="z")
 			episodic_array_reshaped = tf.reshape(tf.matmul(tf.tanh(tf.matmul(z , l1_weights) + l1_biases) , l2_weights)
 			 + l2_biases, [1,-1], name="episodic_array_reshaped")
 			episodic_gate = tf.nn.softmax(episodic_array_reshaped)
+			gate_array.append(episodic_gate)
 			episodic_gate_unpacked = tf.unpack( tf.reshape(episodic_gate, [maximum_story_length,1]))
-			argmax_ep_gate = tf.to_int32(tf.argmax(episodic_gate, 1)) #should be 1
-			# return tf.cond(tf.equal(hops,0),lambda: tf.constant(True),
-			# 	lambda: tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops))))
-			# return tf.logical_and(tf.less(argmax_ep_gate,self.story_len)[0],tf.less(hops,tf.constant(self.memory_hops)))
-			return tf.less(hops,tf.constant(self.memory_hops))
-		def body(mem_state_previous, hops):
-
-			# attention GRU	
-			# outputs, context = cell.rnn_ep(ep_cell, self.facts_, episodic_gate_unpacked, dtype=tf.float32)
-			# outputs, context = ep_cell(ep_cell, self.facts_, episodic_gate_unpacked)
+			# argmax_ep_gate = tf.to_int32(tf.argmax(episodic_gate, 1)) #should be 1
 			context = MGRU(self.facts_, episodic_gate_unpacked)
+			mem_state = tf.nn.relu(tf.matmul(tf.concat(1, [mem_state, context, self.question_state]), mem_weights) + mem_biases)
+			mem_state_array.append(mem_state)
+		# initial_argmax_ep_gate = tf.constant(0)
+		# initial_hops = tf.constant(0)
+		# 	# initial_context = tf.constant([[0.5 for _ in range(50)]])
+		# mem_state, self.hops = tf.while_loop(condition,body,[self.question_state, initial_hops], back_prop=True)
 
-			# memory updates
-			# mem_state_current = mem_cell(mem_state_previous, self.question_state, mem_state_previous, mem_weights, mem_biases, hops)
-			#question_state_next = question_state_prev
-			#print (self.question_state, mem_state_previous)
-			mem_state_current = tf.nn.relu(tf.matmul(tf.concat(1, [mem_state_previous, context, self.question_state]), mem_weights) + mem_biases)
-			
-			hops = tf.add(hops,1)
-			return  mem_state_current, hops
-
-
-
-		initial_argmax_ep_gate = tf.constant(0)
-		initial_hops = tf.constant(0)
-			# initial_context = tf.constant([[0.5 for _ in range(50)]])
-		mem_state, self.hops = tf.while_loop(condition,body,[self.question_state, initial_hops], back_prop=True)
-
-
-		self.a_state = mem_state
+		self.gate_array = tf.concat(0,gate_array)
+		self.a_state = mem_state_array[-1]
 				
 		self.predicted_answer = tf.matmul(self.a_state, answer_weights)
 		self.softmax_answer = tf.nn.softmax(self.predicted_answer)
@@ -240,7 +261,7 @@ class DMN(object):
 			if i == story_mask[story_count]:
 				story_count += 1
 		for i in range(len(story_mask),self.maximum_story_length):
-			story_splited.append([0])
+			story_splited.append([1])
 		
 		for l in range(self.maximum_story_length):
 			input_feed[self.story[l].name] = [story_splited[l]]
@@ -253,7 +274,8 @@ class DMN(object):
 			output_feed = [self.loss,
 							self.gradient_norms, 
 							self.updates,
-							self.argmax_answer]
+							self.argmax_answer,
+							self.gate_array]
 							#self.predicted_answer,
 							#self.a_state,
 							#self.hops]

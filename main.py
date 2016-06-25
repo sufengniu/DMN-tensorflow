@@ -24,7 +24,7 @@ flags=tf.app.flags
 
 # model configuration
 flags.DEFINE_integer("vocab_size", 80000, "vocabulary size.")
-flags.DEFINE_integer("embedding_size", 50, "Size of each model layer.")
+flags.DEFINE_integer("embedding_size", 300, "Size of each model layer.")
 flags.DEFINE_integer("q_depth", 1, "question module depth")
 flags.DEFINE_integer("a_depth", 1, "answer module depth")
 flags.DEFINE_integer("episodic_m_depth", 1, "memory update module depth")
@@ -35,14 +35,14 @@ flags.DEFINE_integer("maximum_attention_length", 15, "max attetion length")
 flags.DEFINE_integer("maximum_question_length", 20, "max question length")
 flags.DEFINE_integer("memory_hops", 5, "max memoy hops")  # testing should be 10
 flags.DEFINE_integer("epoch", 5, "number of repeating training")
-flags.DEFINE_float("learning_rate", 0.1, "Learning rate.")
+flags.DEFINE_float("learning_rate", 0.2, "Learning rate.")
 flags.DEFINE_float("learning_rate_decay_op", 0.99, "Learning rate decay.")
 flags.DEFINE_float("dropout_rate", 0.4, "dropout rates")
 flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 flags.DEFINE_integer("batch_size", 8, "Batch size to use during training.")
 # flags.DEFINE_integer("max_len", 100, "sequence length longer than this will be ignored.")
 # flags.DEFINE_integer("depth", 1, "Number of layers in the model.")
-flags.DEFINE_string("word2vec_dir", "./glove.6B.50d.txt", "word2vec location")
+flags.DEFINE_string("word2vec_dir", "./glove.6B.300d.txt", "word2vec location")
 flags.DEFINE_string("data_dir", "bAbI_data/en", "Data directory")
 flags.DEFINE_string("train_dir", "data", "Training directory.")
 flags.DEFINE_boolean("use_lstm", False, "Set True using LSTM, or False using GRU")
@@ -89,7 +89,7 @@ def create_model(session, vocab_size, forward_only):
 def train():
   print("[*] Preparing bAbI data ... in %s" % FLAGS.data_dir)
   babi_train_raw, babi_validation_raw = data_utils.get_babi_raw(FLAGS.data_type)
-  vocab, ivocab, embedding, embedding_size = data_utils.load_glove_w2v(FLAGS.word2vec_dir)
+  vocab, ivocab, embedding, embedding_size = data_utils.load_glove_w2v(FLAGS.word2vec_dir, FLAGS.embedding_size)
   if embedding_size != FLAGS.embedding_size:
     raise Exception ("Embedding size of model and word2vec must match.")
   t_context, t_questions, t_answers, t_fact_counts, t_input_masks = data_utils.process_input(babi_train_raw, vocab, ivocab)
@@ -105,7 +105,7 @@ def train():
         print ("step %i" % j)
         for i in range(len(t_context)):
           start_time = time.time()
-          step_loss, _, _, answer = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
+          step_loss, _, _, answer, gate = model.step(sess, t_context[i], t_input_masks[i], t_questions[i], t_answers[i], False)
           print (step_loss, ivocab[int(answer)])
           print ('correct answer:%s' % ivocab[int(t_answers[i])])
           step_time += (time.time() - start_time) / FLAGS.steps_per_checkpoint
@@ -144,7 +144,7 @@ def validation():
   with tf.Session() as sess:
     print("[*] Preparing bAbI data ... in %s" % FLAGS.data_dir)
     _, babi_validation_raw = data_utils.get_babi_raw(FLAGS.data_type)
-    vocab, ivocab, embedding, embedding_size = data_utils.load_glove_w2v(FLAGS.word2vec_dir)
+    vocab, ivocab, embedding, embedding_size = data_utils.load_glove_w2v(FLAGS.word2vec_dir, FLAGS.embedding_size)
     if embedding_size != FLAGS.embedding_size:
       raise Exception ("Embedding size of model and word2vec must match.")
     v_context, v_questions, v_answers, v_fact_counts, v_input_masks = data_utils.process_input(babi_validation_raw, vocab, ivocab)

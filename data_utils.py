@@ -28,22 +28,22 @@ def init_babi(fname):
   # random.shuffle(tasks)
   return tasks
 
-def load_glove_w2v(fname):
+def load_glove_w2v(fname, word_dim):
   print ("[*] Loading word2vec from %s" % fname)
   vocab = {}
   ivocab = {}
   embedding = []
   # add [PAD] and [UNK]
-  vocab['PAD'] = 0
-  ivocab[0] = 'PAD'
-  embedding.append([0.5 for i in range(50)])
-  vocab['UNK'] = 1
-  ivocab[1] = 'UNK'
-  embedding.append([1.0 for i in range(50)])
+  # vocab['PAD'] = 0
+  # ivocab[0] = 'PAD'
+  # embedding.append([0.5 for i in range(word_dim)])
+  # vocab['UNK'] = 0
+  # ivocab[0] = 'UNK'
+  # embedding.append([1.0 for i in range(word_dim)])
   for i, line in enumerate(open(fname)):
     line = line.split()
-    vocab[line[0]] = i+2  # 2 is the offset of PAD and UNK
-    ivocab[i+2] = line[0]
+    vocab[line[0]] = i+0  # 2 is the offset of PAD and UNK
+    ivocab[i+0] = line[0]
     embedding.append(map(float, line[1:]))
   embedding_size = len(embedding[0])
   return vocab, ivocab, embedding, embedding_size
@@ -119,8 +119,8 @@ def get_babi_raw(id, test_id=""):
   babi_name = babi_map[id]
   babi_test_name = babi_map[test_id]
   if babi_name == 'all_shuffled':
-    combine_shuffle(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en'), babi_name)
-  babi_train_raw = init_babi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en/%s_train.txt' % babi_name))
+    combine_shuffle(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en-10k'), babi_name)
+  babi_train_raw = init_babi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en-10k/%s_train.txt' % babi_name))
   babi_test_raw = init_babi(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bAbI_data/en/%s_test.txt' % babi_test_name))
   return babi_train_raw, babi_test_raw
 
