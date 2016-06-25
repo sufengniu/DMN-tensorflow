@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import random
-
+import math
 import numpy as np
 from six.moves import xrange 
 import tensorflow as tf
@@ -11,6 +11,7 @@ import tensorflow as tf
 #from tensorflow.models.rnn import rnn
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import init_ops
 import models.seq2seq as seq2seq
 import models.cell as cell
 
@@ -62,10 +63,15 @@ class DMN(object):
 		
 		print("[*] Creating Dynamic Memory Network ...")
 		# Initializing word2vec
-		W = tf.Variable(tf.constant(0.0, shape=[vocab_size, embedding_size]),
-								trainable=False, name="W")
-		self.embedding_placeholder = tf.placeholder(tf.float32, [vocab_size, embedding_size])
-		self.embedding_init = W.assign(self.embedding_placeholder)
+		sqrt3 = math.sqrt(3)
+		initializer = init_ops.random_uniform_initializer(-sqrt3, sqrt3)
+		W = tf.get_variable("embedding", [self.vocab_size,self.embedding_size],
+			initializer=initializer)
+
+		# W = tf.Variable(tf.constant(0.0, shape=[vocab_size, embedding_size]),
+		# 						trainable=False, name="W")
+		# self.embedding_placeholder = tf.placeholder(tf.float32, [vocab_size, embedding_size])
+		# self.embedding_init = W.assign(self.embedding_placeholder)
 
 		# Sentence token placeholder
 		self.story = []

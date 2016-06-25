@@ -23,8 +23,8 @@ import models.seq2seq
 flags=tf.app.flags
 
 # model configuration
-flags.DEFINE_integer("vocab_size", 80000, "vocabulary size.")
-flags.DEFINE_integer("embedding_size", 300, "Size of each model layer.")
+flags.DEFINE_integer("vocab_size", 400000, "vocabulary size.")
+flags.DEFINE_integer("embedding_size", 50, "Size of each model layer.")
 flags.DEFINE_integer("q_depth", 1, "question module depth")
 flags.DEFINE_integer("a_depth", 1, "answer module depth")
 flags.DEFINE_integer("episodic_m_depth", 1, "memory update module depth")
@@ -42,7 +42,7 @@ flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
 flags.DEFINE_integer("batch_size", 8, "Batch size to use during training.")
 # flags.DEFINE_integer("max_len", 100, "sequence length longer than this will be ignored.")
 # flags.DEFINE_integer("depth", 1, "Number of layers in the model.")
-flags.DEFINE_string("word2vec_dir", "./glove.6B.300d.txt", "word2vec location")
+flags.DEFINE_string("word2vec_dir", "./glove.6B.50d.txt", "word2vec location")
 flags.DEFINE_string("data_dir", "bAbI_data/en", "Data directory")
 flags.DEFINE_string("train_dir", "data", "Training directory.")
 flags.DEFINE_boolean("use_lstm", False, "Set True using LSTM, or False using GRU")
@@ -97,7 +97,7 @@ def train():
   with tf.Graph().as_default():
     with tf.Session() as sess:
       model = create_model(sess, len(vocab), False)
-      model.init_embedding(sess, embedding)
+      # model.init_embedding(sess, embedding)
       step_time, loss = 0.0, 0.0
       current_step = 0
       previous_losses = []
@@ -150,7 +150,7 @@ def validation():
     v_context, v_questions, v_answers, v_fact_counts, v_input_masks = data_utils.process_input(babi_validation_raw, vocab, ivocab)
     # Create model and load parameters.
     model = create_model(sess, len(vocab), True)
-    model.init_embedding(sess, embedding)
+    # model.init_embedding(sess, embedding)
     counter = 0
     for i in range(len(v_context)):
       start_time = time.time()
